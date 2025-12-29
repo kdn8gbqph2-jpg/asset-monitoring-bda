@@ -1,0 +1,398 @@
+@page
+@model asset_monitoring.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Bharatpur Pumps Dashboard";
+}
+
+<!-- Bootstrap & Icons -->
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+
+<style>
+    body {
+        background: #f8fafc;
+    }
+
+    .stat-card {
+        border-radius: .5rem;
+        padding: 1rem;
+        background: #fff;
+        box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    .stat-large {
+        font-size: 2.25rem;
+        font-weight: 700;
+    }
+
+    .stat-title {
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .map-placeholder {
+        height: 320px;
+        background: linear-gradient(90deg,#f8fafc,#eef2ff);
+        border-radius: .5rem;
+        border: 1px solid #e6e9ee;
+    }
+
+    .table-card {
+        border-radius: .5rem;
+        border: 1px solid #e6e9ee;
+        padding: .5rem;
+        background: #fff;
+    }
+
+    .top-bar {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+    }
+
+    .lang-btn {
+        border-radius: .5rem;
+        border: 1px solid #d1d5db;
+        padding: .25rem .75rem;
+        background: #fff;
+    }
+
+    .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .enlarged-view {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 70vh;
+        z-index: 10;
+        background: #fff;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+        overflow: auto;
+        transition: all 0.3s;
+    }
+    .row.g-3 {
+        position: relative;
+    }
+</style>
+
+<!-- ================= HEADER ================= -->
+<header class="mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+
+        <div class="top-bar">
+            <button class="lang-btn">EN / HI</button>
+            <button class="btn btn-outline-primary btn-sm" title="Download Report">
+                <i class="bi bi-download"></i>
+            </button>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+            <h4 class="m-0 fw-semibold">Bharatpur Pumps Dashboard</h4>
+
+            <button class="btn btn-outline-primary d-flex align-items-center gap-2"
+                    data-bs-toggle="modal"
+                    data-bs-target="#loginModal">
+                <img src="~/images/user-logo.png" class="avatar" alt="User" />
+                <span>Sign in</span>
+            </button>
+        </div>
+
+    </div>
+</header>
+
+<!-- ================= KPI SECTION ================= -->
+<section class="mb-4">
+    <div class="row g-3">
+
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-title">Total Pumps</div>
+                <div class="stat-large">@Model.TotalPumps</div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-title">Running Now</div>
+                <div class="stat-large text-success">@Model.RunningPumpCount</div>
+            </div>
+        </div>
+
+
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-title">Avg Runtime (hrs)</div>
+                <div class="stat-large">@Model.AvgRuntime</div>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- ================= MAP / LIST TOGGLE ================= -->
+<section class="mb-3">
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary btn-sm" id="btnMap">MAP VIEW</button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnList">LIST VIEW</button>
+        <button class="btn btn-outline-success btn-sm" id="btnRefresh" title="Refresh Data">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+</section>
+
+<!-- ================= MAP + TABLE ================= -->
+<section class="mb-4">
+    <div class="row g-3">
+
+        <!-- MAP -->
+        <div class="col-12 col-md-6" id="mapCol">
+            <div class="map-placeholder p-3" id="map">
+                <div class="text-muted">
+                    Pump Locations
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="col-md-6" id="tableCol">
+            <div class="table-card">
+
+                <table class="table table-borderless mb-2 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:40px;">
+                                <input type="checkbox" />
+                            </th>
+                            <th>Pump ID</th>
+                            <th>Vendor</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Last Update</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.Pumps)
+                        {
+                            <tr>
+                                <td><input type="checkbox" /></td>
+                                <td>@p.PumpId</td>
+                                <td>@p.VendorName</td>
+                                <td>@p.Location</td>
+                                <td>
+                                    @if (p.Status == "ON")
+                                    {
+                                        <span class="badge bg-success">ON</span>
+                                    }
+                                    else if (p.Status == "OFF")
+                                    {
+                                        <span class="badge bg-secondary">OFF</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">MAINTENANCE</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (p.LastRun.HasValue)
+                                    {
+                                        var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+                                        var lastRunIst = TimeZoneInfo.ConvertTimeFromUtc(p.LastRun.Value.ToUniversalTime(), istZone);
+                                        var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
+                                        <span class="badge bg-info text-dark" title="@lastRunIst.ToString("dd-MMM-yyyy HH:mm:ss") IST">
+                                            @((nowIst - lastRunIst).TotalHours.ToString("0.#")) hrs ago
+                                            <span class="d-block small text-muted">@lastRunIst.ToString("dd-MMM-yyyy hh:mm tt") IST</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-primary btn-sm">
+                        <i class="bi bi-exclamation-circle"></i> Report Issue
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- ================= LOGIN MODAL ================= -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <form method="post" asp-page-handler="Login">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Sign in</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input asp-for="LoginModel.Username" class="form-control" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input asp-for="LoginModel.Password" type="password" class="form-control" />
+                    </div>
+
+                    @if (Model.LoginMessage != null)
+                    {
+                        <div class="alert alert-info">@Model.LoginMessage</div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Sign in</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+
+    <script>
+        const mapCol = document.getElementById('mapCol');
+        const tableCol = document.getElementById('tableCol');
+        let enlarged = null;
+
+        document.getElementById('btnMap').onclick = () => {
+            if (enlarged === 'map') {
+                mapCol.classList.remove('enlarged-view');
+                tableCol.style.display = '';
+                enlarged = null;
+            } else {
+                mapCol.classList.add('enlarged-view');
+                tableCol.style.display = 'none';
+                enlarged = 'map';
+            }
+        };
+
+        document.getElementById('btnList').onclick = () => {
+            if (enlarged === 'list') {
+                tableCol.classList.remove('enlarged-view');
+                mapCol.style.display = '';
+                enlarged = null;
+            } else {
+                tableCol.classList.add('enlarged-view');
+                mapCol.style.display = 'none';
+                enlarged = 'list';
+            }
+        };
+
+        // Refresh data via AJAX (existing code)
+        document.getElementById('btnRefresh').onclick = function () {
+            fetch('?handler=Refresh')
+                .then(response => response.json())
+                .then(data => {
+                    // ...existing refresh logic...
+                });
+        };
+    </script>
+    <script>
+        let map;
+        let markersLayer;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initLeafletMap();
+        });
+
+        // Add these before your map initialization
+        const mapCenterLat = @Model.MapCenterLatitude;
+        const mapCenterLng = @Model.MapCenterLongitude;
+        const mapZoom = @Model.MapZoom;
+
+        // Replace hardcoded values with config variables
+        function initLeafletMap() {
+            map = L.map('map').setView([mapCenterLat, mapCenterLng], mapZoom);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map);
+
+            loadPumpMarkers();
+        }
+
+        function loadPumpMarkers() {
+            fetch('?handler=Refresh')
+                .then(r => r.json())
+                .then(data => {
+                    markersLayer.clearLayers();
+
+                    data.pumps.forEach(p => {
+                        if (p.latitude && p.longitude) {
+                            addPumpMarker(p);
+                        }
+                    });
+                })
+                .catch(err => console.error("Map data load failed", err));
+        }
+
+        function addPumpMarker(pump) {
+            const icon = getStatusIcon(pump.status);
+
+            const marker = L.marker(
+                [parseFloat(pump.latitude), parseFloat(pump.longitude)],
+                { icon: icon }
+            );
+
+            const popup = `
+                <strong>${pump.vendorName}</strong><br/>
+                Location: ${pump.location ?? "-"}<br/>
+                Status: ${pump.status}<br/>
+                Last Updated: ${new Date(pump.lastUpdated).toLocaleString()}
+            `;
+
+            marker.bindPopup(popup);
+            markersLayer.addLayer(marker);
+        }
+
+        function getStatusIcon(status) {
+            let iconFile = "marker-blue.png";
+
+            if (status === "ON") iconFile = "marker-green.png";
+            else if (status === "OFF") iconFile = "marker-red.png";
+            else if (status === "MAINTENANCE") iconFile = "marker-yellow.png";
+
+            return L.icon({
+                iconUrl: `/images/${iconFile}`,
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34]
+            });
+        }
+
+        // Auto-refresh markers every 30 seconds
+        setInterval(loadPumpMarkers, 30000);
+    </script>
+
+}

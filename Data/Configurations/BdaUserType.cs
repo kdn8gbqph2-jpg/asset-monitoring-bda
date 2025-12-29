@@ -16,12 +16,12 @@ namespace asset_monitoring.Models
     public enum PumpStatus
     {
         [EnumMember(Value = "ON")]
-        on,
+        On,
 
         [EnumMember(Value = "OFF")]
-        off,
+        Off,
 
-        [EnumMember(Value = "MAINTAINENCE")]
-        maintenance
+        [EnumMember(Value = "MAINTENANCE")]
+        Maintenance
     }
 }
