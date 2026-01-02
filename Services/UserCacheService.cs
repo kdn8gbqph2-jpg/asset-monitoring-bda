@@ -28,8 +28,8 @@
                 .ToList();
 
             Users = users
-                .Where(u => !string.IsNullOrWhiteSpace(u.MobileNumber))
-                .ToDictionary(u => u.MobileNumber, u => u);
+                .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
+                .ToDictionary(u => u.UserName, u => u);
         }
 
         // Optional: manual reload

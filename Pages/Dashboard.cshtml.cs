@@ -130,10 +130,14 @@ namespace asset_monitoring.Pages
 
             LoginMessage = $"Welcome {user.Name} ({user.UserType})";
 
-            // OPTIONAL: store session values
             HttpContext.Session.SetString("UserName", user.Name);
             HttpContext.Session.SetString("UserType", user.UserType);
             HttpContext.Session.SetString("Mobile", user.MobileNumber);
+
+            if (user.UserType == "ADMIN")
+            {
+                return RedirectToPage("/Admin");
+            }
 
             await OnGetAsync();
             return Page();

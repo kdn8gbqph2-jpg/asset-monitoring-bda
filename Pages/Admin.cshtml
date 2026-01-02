@@ -1,0 +1,53 @@
+@page
+@model asset_monitoring.Pages.AdminModel
+@{
+    ViewData["Title"] = "Admin Panel";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Admin Panel</h2>
+    <form method="post" asp-page-handler="Logout" class="mb-0">
+        <button type="submit" class="btn btn-outline-danger">Logout</button>
+    </form>
+</div>
+
+@if (!Model.IsAdmin)
+{
+    <div class="alert alert-danger">Access denied. Admins only.</div>
+}
+else
+{
+    <div class="mb-3">
+        <button class="btn btn-success" asp-page-handler="Add">Add User</button>
+    </div>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>UserId</th>
+                <th>Name</th>
+                <th>UserType</th>
+                <th>Mobile</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var user in Model.Users)
+        {
+            <tr>
+                <td>@user.UserId</td>
+                <td>@user.Name</td>
+                <td>@user.UserType</td>
+                <td>@user.MobileNumber</td>
+                <td>
+                    <form method="post" asp-page-handler="Edit" asp-route-id="@user.UserId" class="d-inline">
+                        <button class="btn btn-primary btn-sm">Edit</button>
+                    </form>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@user.UserId" class="d-inline" onsubmit="return confirm('Delete this user?');">
+                        <button class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

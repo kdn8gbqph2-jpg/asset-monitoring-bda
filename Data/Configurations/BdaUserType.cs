@@ -4,14 +4,9 @@ namespace asset_monitoring.Models
 {
     public enum BdaUserType
     {
-        [EnumMember(Value = "ADMIN")]
-        Admin,
-
-        [EnumMember(Value = "OPERATOR")]
-        Operator,
-
-        [EnumMember(Value = "BDA_OFFICIAL")]
-        BdaOfficial
+        ADMIN,
+        OPERATOR,
+        BDA_OFFICIAL
     }
     public enum PumpStatus
     {

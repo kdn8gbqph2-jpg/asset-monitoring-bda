@@ -34,6 +34,7 @@ namespace asset_monitoring.Data
                 entity.ToView(null); // IMPORTANT for stored procedure
 
                 entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.UserName).HasColumnName("userName");
                 entity.Property(e => e.UserType).HasColumnName("user_type");
                 entity.Property(e => e.MobileNumber).HasColumnName("mobile_number");
                 entity.Property(e => e.Password).HasColumnName("password");
