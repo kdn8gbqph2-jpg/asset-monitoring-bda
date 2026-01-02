@@ -1,13 +1,17 @@
-using System;
-using System.IO;
-using Microsoft.EntityFrameworkCore;
 using asset_monitoring.Data;
+using asset_monitoring.Services;
+using Microsoft.EntityFrameworkCore;
 using NLog;
 using NLog.Web;
+using QuestPDF.Infrastructure;
+using System;
+using System.IO;
 
 // Use the new recommended NLog setup API
 LogManager.Setup().LoadConfigurationFromAppSettings();
 var logger = LogManager.GetCurrentClassLogger();
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 try
 {
@@ -31,10 +35,21 @@ try
 
     // Read connection string and register DbContext for MySQL (Pomelo)
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    logger.Info("Current connection string :", connectionString);
+
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    logger.Info("Current connection string :" + connectionString);
 
+    //Services
+    builder.Services.AddSingleton<UserCacheService>();
+    builder.Services.AddScoped<PumpDashboardService>();
+
+    builder.Services.AddSession(options =>
+    {
+        options.IdleTimeout = TimeSpan.FromMinutes(30);
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+    });
     var app = builder.Build();
 
     // Configure the HTTP request pipeline.
@@ -47,6 +62,7 @@ try
     app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseRouting();
+    app.UseSession();
     app.UseAuthorization();
     app.MapRazorPages();
 

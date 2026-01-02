@@ -78,9 +78,27 @@
         box-shadow: 0 2px 16px rgba(0,0,0,0.15);
         overflow: auto;
         transition: all 0.3s;
+        display: block !important; /* Ensure it's visible */
     }
     .row.g-3 {
         position: relative;
+    }
+
+    .table.table-bordered-custom th,
+    .table.table-bordered-custom td {
+        border: 1px solid #dee2e6 !important;
+    }
+    .table.table-bordered-custom {
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 1px solid #dee2e6;
+        background: #fff;
+    }
+
+    .table-responsive-x {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 </style>
 
@@ -90,7 +108,7 @@
 
         <div class="top-bar">
             <button class="lang-btn">EN / HI</button>
-            <button class="btn btn-outline-primary btn-sm" title="Download Report">
+            <button class="btn btn-outline-primary btn-sm" title="Download Report" onclick="window.location.href='?handler=DownloadReport'">
                 <i class="bi bi-download"></i>
             </button>
         </div>
@@ -143,9 +161,6 @@
     <div class="d-flex gap-2">
         <button class="btn btn-primary btn-sm" id="btnMap">MAP VIEW</button>
         <button class="btn btn-outline-secondary btn-sm" id="btnList">LIST VIEW</button>
-        <button class="btn btn-outline-success btn-sm" id="btnRefresh" title="Refresh Data">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
-        </button>
     </div>
 </section>
 
@@ -165,69 +180,68 @@
         <!-- TABLE -->
         <div class="col-md-6" id="tableCol">
             <div class="table-card">
-
-                <table class="table table-borderless mb-2 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width:40px;">
-                                <input type="checkbox" />
-                            </th>
-                            <th>Pump ID</th>
-                            <th>Vendor</th>
-                            <th>Location</th>
-                            <th>Status</th>
-                            <th>Last Update</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var p in Model.Pumps)
-                        {
+                <div class="table-responsive-x">
+                    <table class="table mb-2 align-middle">
+                        <thead class="table-light">
                             <tr>
-                                <td><input type="checkbox" /></td>
-                                <td>@p.PumpId</td>
-                                <td>@p.VendorName</td>
-                                <td>@p.Location</td>
-                                <td>
-                                    @if (p.Status == "ON")
-                                    {
-                                        <span class="badge bg-success">ON</span>
-                                    }
-                                    else if (p.Status == "OFF")
-                                    {
-                                        <span class="badge bg-secondary">OFF</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-warning text-dark">MAINTENANCE</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (p.LastRun.HasValue)
-                                    {
-                                        var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
-                                        var lastRunIst = TimeZoneInfo.ConvertTimeFromUtc(p.LastRun.Value.ToUniversalTime(), istZone);
-                                        var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
-                                        <span class="badge bg-info text-dark" title="@lastRunIst.ToString("dd-MMM-yyyy HH:mm:ss") IST">
-                                            @((nowIst - lastRunIst).TotalHours.ToString("0.#")) hrs ago
-                                            <span class="d-block small text-muted">@lastRunIst.ToString("dd-MMM-yyyy hh:mm tt") IST</span>
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span>—</span>
-                                    }
-                                </td>
+                                <th style="width:40px;">
+                                    <input type="checkbox" />
+                                </th>
+                                <th>Pump ID</th>
+                                <th>Vendor</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Last Update</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Model.Pumps)
+                            {
+                                <tr>
+                                    <td><input type="checkbox" /></td>
+                                    <td>@p.PumpId</td>
+                                    <td>@p.VendorName</td>
+                                    <td>@p.Location</td>
+                                    <td>
+                                        @if (p.Status == "ON")
+                                        {
+                                            <span class="badge bg-success">ON</span>
+                                        }
+                                        else if (p.Status == "OFF")
+                                        {
+                                            <span class="badge bg-secondary">OFF</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark">MAINTENANCE</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (p.LastRun.HasValue)
+                                        {
+                                            var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+                                            var lastRunIst = TimeZoneInfo.ConvertTimeFromUtc(p.LastRun.Value.ToUniversalTime(), istZone);
+                                            var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
+                                            <span class="badge bg-info text-dark" title="@lastRunIst.ToString("dd-MMM-yyyy HH:mm:ss") IST">
+                                                @((nowIst - lastRunIst).TotalHours.ToString("0.#")) hrs ago
+                                                <span class="d-block small text-muted">@lastRunIst.ToString("dd-MMM-yyyy hh:mm tt") IST</span>
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span>—</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
                 <div class="d-flex justify-content-end">
                     <button class="btn btn-primary btn-sm">
                         <i class="bi bi-exclamation-circle"></i> Report Issue
                     </button>
                 </div>
-
             </div>
         </div>
 
@@ -288,10 +302,12 @@
                 mapCol.classList.remove('enlarged-view');
                 tableCol.style.display = '';
                 enlarged = null;
+                setTimeout(() => { if (window.map) window.map.invalidateSize(); }, 350);
             } else {
                 mapCol.classList.add('enlarged-view');
                 tableCol.style.display = 'none';
                 enlarged = 'map';
+                setTimeout(() => { if (window.map) window.map.invalidateSize(); }, 350);
             }
         };
 
