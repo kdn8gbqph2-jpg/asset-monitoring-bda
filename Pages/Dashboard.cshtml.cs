@@ -67,7 +67,7 @@ namespace asset_monitoring.Pages
         {
             Logger.Info("Dashboard OnGetAsync started");
 
-            var pumpData = await _PumpdashboardService.GetPumpsAsync();
+            var pumpData = await _PumpdashboardService.GetPumpsAsync(LoginModel.Username);
 
             Pumps = pumpData.Select(p => new PumpRow
             {
@@ -78,7 +78,8 @@ namespace asset_monitoring.Pages
                 Longitude = p.Longitude,
                 Status = p.Status,
                 LastUpdated = p.LastUpdated,
-                LastRun = null
+                LastRun = null,
+                MobileNumber = p.MobileNumber // <-- Add this line
             }).ToList();
 
             TotalPumps = Pumps.Count;
@@ -156,81 +157,6 @@ namespace asset_monitoring.Pages
                 pumps = Pumps
             });
         }
-
-        public async Task<IActionResult> OnGetDownloadReportAsync()
-        {
-            await OnGetAsync(); // Ensure Pumps is populated
-
-            var stream = new MemoryStream();
-
-            var document = Document.Create(container =>
-            {
-                container.Page(page =>
-                {
-                    page.Margin(20);
-                    page.Header().Text("Bharatpur Pumps Report").FontSize(20).Bold().AlignCenter();
-                    page.Content().Table(table =>
-                    {
-                        // Define columns
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.ConstantColumn(60); // Pump ID
-                            columns.RelativeColumn();
-                            columns.RelativeColumn();
-                            columns.RelativeColumn();
-                            columns.RelativeColumn();
-                            columns.RelativeColumn();
-                        });
-
-                        // Header row
-                        table.Header(header =>
-                        {
-                            header.Cell().Element(CellStyle).Text("Pump ID").Bold();
-                            header.Cell().Element(CellStyle).Text("Vendor").Bold();
-                            header.Cell().Element(CellStyle).Text("Location").Bold();
-                            header.Cell().Element(CellStyle).Text("Status").Bold();
-                            header.Cell().Element(CellStyle).Text("Last Update").Bold();
-                            header.Cell().Element(CellStyle).Text("Latitude,Longitude").Bold();
-                        });
-
-                        // Data rows
-                        foreach (var p in Pumps)
-                        {
-                            table.Cell().Element(CellStyle).Text(p.PumpId ?? "");
-                            table.Cell().Element(CellStyle).Text(p.VendorName ?? "");
-                            table.Cell().Element(CellStyle).Text(p.Location ?? "");
-                            table.Cell().Element(CellStyle).Text(p.Status ?? "");
-                            table.Cell().Element(CellStyle).Text(p.LastUpdated.ToString("dd-MMM-yyyy HH:mm"));
-                            table.Cell().Element(CellStyle).Text($"{p.Latitude},{p.Longitude}");
-                        }
-
-                        static IContainer CellStyle(IContainer container) =>
-                            container.PaddingVertical(2).PaddingHorizontal(4);
-                    });
-                });
-            });
-
-            document.GeneratePdf(stream);
-            stream.Position = 0;
-            return File(stream, "application/pdf", "BharatpurPumpsReport.pdf");
-        }
-
-        public async Task<IActionResult> OnGetDownloadCsvAsync()
-        {
-            await OnGetAsync(); // Ensure Pumps is populated
-
-            var csv = new System.Text.StringBuilder();
-            csv.AppendLine("Pump ID,Vendor,Location,Status,Last Update,Latitude,Longitude");
-
-            foreach (var p in Pumps)
-            {
-                csv.AppendLine($"\"{p.PumpId}\",\"{p.VendorName}\",\"{p.Location}\",\"{p.Status}\",\"{p.LastUpdated:dd-MMM-yyyy HH:mm}\",\"{p.Latitude}\",\"{p.Longitude}\"");
-            }
-
-            var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
-            return File(bytes, "text/csv", "BharatpurPumpsReport.csv");
-        }
-
         public record PumpRow
         {
             public string PumpId { get; init; } = "";
@@ -241,6 +167,7 @@ namespace asset_monitoring.Pages
             public string? Status { get; init; }
             public DateTime LastUpdated { get; init; }
             public DateTime? LastRun { get; init; }
+            public string? MobileNumber { get; init; } // <-- Add this line
         }
 
         public class LoginInputModel

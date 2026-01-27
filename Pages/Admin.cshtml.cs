@@ -11,23 +11,28 @@ namespace asset_monitoring.Pages
     {
         private readonly ApplicationDbContext _context;
         private readonly UserCacheService _userCache;
+        private readonly PumpDashboardService _pumpDashboardService;
+        private readonly ReportExportService _reportExportService;
 
-        [BindProperty]
-        public EditUserInputModel EditUserModel { get; set; } = new();
-        public AdminModel(ApplicationDbContext context, UserCacheService userCache)
+        public AdminModel(ApplicationDbContext context, UserCacheService userCache, PumpDashboardService pumpDashboardService, ReportExportService reportExportService)
         {
             _context = context;
             _userCache = userCache;
+            _pumpDashboardService = pumpDashboardService;
+            _reportExportService = reportExportService;
         }
 
         public List<BdaUserMaster> Users { get; set; } = new();
+        public List<DashboardPumpDto> Pumps { get; set; } = new();
+        public List<BdaPumpLocation> Locations { get; set; } = new();
         public bool IsAdmin { get; set; }
+        public string? LoggedInUserName { get; set; }
 
         public async Task<IActionResult> OnGetAsync()
         {
-            // Example: get userType from session or claims
             var userType = HttpContext.Session.GetString("UserType");
             IsAdmin = userType == "ADMIN";
+            LoggedInUserName = HttpContext.Session.GetString("UserName"); // Add this line
 
             if (!IsAdmin)
                 return Page();
@@ -36,65 +41,69 @@ namespace asset_monitoring.Pages
                 .AsNoTracking()
                 .Where(u => u.IsActive)
                 .ToListAsync();
+
+            // No username filter for admin: fetch all active pumps with mobile number
+            Pumps = await _pumpDashboardService.GetPumpsAsync();
+
+            Locations = await _context.BdaPumpLocations
+                .AsNoTracking()
+                .ToListAsync();
+
             return Page();
         }
 
-        public async Task<IActionResult> OnPostDeleteAsync(int id)
-        {
-            var userType = HttpContext.Session.GetString("UserType");
-            IsAdmin = userType == "ADMIN";
-            if (!IsAdmin)
-                return Forbid();
+        // Add handlers for pump edit/delete as needed
+        [BindProperty]
+        public int PumpId { get; set; }
+        [BindProperty]
+        public string? VendorName { get; set; }
+        [BindProperty]
+        public string? Category { get; set; }
+        [BindProperty]
+        public string? LocationName { get; set; }
+        [BindProperty]
+        public string? Status { get; set; }
+        [BindProperty]
+        public bool IsActive { get; set; }
 
-            var user = await _context.BdaUserMasters.FindAsync(id);
-            if (user != null)
+        public async Task<IActionResult> OnPostDeletePumpAsync(int id)
+        {
+            var pump = await _context.BdaPumpMasters.FindAsync(id);
+            if (pump != null)
             {
-                    user.IsActive = false; // Set is_active to 0 (false)
-                    _context.BdaUserMasters.Update(user);
+                // Soft delete if you have IsActive, else remove
+                pump.IsActive = false;
+                _context.BdaPumpMasters.Update(pump);
                 await _context.SaveChangesAsync();
             }
             return RedirectToPage();
         }
 
-        // Add OnPostAddAsync and OnPostEditAsync as needed for add/update logic
+        public async Task<IActionResult> OnPostUpdatePumpAsync()
+        {
+            await _pumpDashboardService.UpdatePumpDetailsAsync(
+                PumpId,
+                VendorName ?? "",
+                Category,
+                LocationName ?? "",
+                Status ?? "",
+                IsActive
+            );
+            return new JsonResult(new { success = true });
+        }
 
-        public async Task<IActionResult> OnPostLogoutAsync()
+        public IActionResult OnGetDownloadReport()
+        {
+            // Always fetch fresh data for all active pumps
+            var allActivePumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsCsv(allActivePumps);
+        }
+
+        public IActionResult OnPostLogout()
         {
             HttpContext.Session.Clear();
-            return RedirectToPage("/Dashboard");
+            return RedirectToPage("/Index");
         }
-
-        public async Task<IActionResult> OnPostEditAsync()
-        {
-            var userType = HttpContext.Session.GetString("UserType");
-            IsAdmin = userType == "ADMIN";
-            if (!IsAdmin)
-                return Forbid();
-
-            if (!ModelState.IsValid)
-            {
-                await OnGetAsync();
-                return Page();
-            }
-
-            var user = await _context.BdaUserMasters.FindAsync(EditUserModel.UserId);
-            if (user != null)
-            {
-                user.Name = EditUserModel.Name;
-                if (Enum.TryParse<BdaUserType>(EditUserModel.UserType, out var ut))
-                    user.UserType = ut;
-                user.MobileNumber = EditUserModel.MobileNumber;
-                user.Password = EditUserModel.Password;
-                var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
-                user.RowUpdationDateTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
-
-                _context.BdaUserMasters.Update(user);
-                await _context.SaveChangesAsync();
-            }
-            return RedirectToPage();
-        }
-
-
     }
     public class EditUserInputModel
     {

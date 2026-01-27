@@ -14,6 +14,7 @@ namespace asset_monitoring.Data
         public DbSet<BdaPumpMaster> BdaPumpMasters { get; set; } = null!;
         public DbSet<BdaPumpLocation> BdaPumpLocations { get; set; } = null!;
         public DbSet<BdaUserMaster> BdaUserMasters { get; set; } = null!;
+        public DbSet<PumpEditDto> PumpEditDtos { get; set; }
 
         public DbSet<PumpStatusLog> PumpStatusLogs { get; set; } = null!;
         public DbSet<PumpStatusEntry> PumpStatusEntries { get; set; } = null!;
@@ -39,6 +40,11 @@ namespace asset_monitoring.Data
                 entity.Property(e => e.MobileNumber).HasColumnName("mobile_number");
                 entity.Property(e => e.Password).HasColumnName("password");
             });
+
+
+            modelBuilder.Entity<PumpEditDto>()
+                .HasNoKey()
+                .ToView(null);
 
             base.OnModelCreating(modelBuilder);
         }

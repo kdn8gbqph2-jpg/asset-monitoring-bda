@@ -1,7 +1,7 @@
 @page
 @model asset_monitoring.Pages.DashboardModel
 @{
-    ViewData["Title"] = "Bharatpur Pumps Dashboard";
+    ViewData["Title"] = "Assets Moniotirng Dashboard";
 }
 
 <!-- Bootstrap & Icons -->
@@ -148,7 +148,7 @@
 
         <div class="col-md-3">
             <div class="stat-card">
-                <div class="stat-title">Avg Runtime (hrs)</div>
+                <div class="stat-title">Total Runtime</div>
                 <div class="stat-large">@Model.AvgRuntime</div>
             </div>
         </div>
@@ -190,6 +190,7 @@
                                 <th>Pump ID</th>
                                 <th>Vendor</th>
                                 <th>Location</th>
+                                <th>Mobile</th> <!-- Add this line -->
                                 <th>Status</th>
                                 <th>Last Update</th>
                             </tr>
@@ -202,6 +203,7 @@
                                     <td>@p.PumpId</td>
                                     <td>@p.VendorName</td>
                                     <td>@p.Location</td>
+                                    <td>@p.MobileNumber</td> <!-- Add this line -->
                                     <td>
                                         @if (p.Status == "ON")
                                         {

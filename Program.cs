@@ -43,6 +43,7 @@ try
     //Services
     builder.Services.AddSingleton<UserCacheService>();
     builder.Services.AddScoped<PumpDashboardService>();
+    builder.Services.AddScoped<ReportExportService>();
 
     builder.Services.AddSession(options =>
     {
