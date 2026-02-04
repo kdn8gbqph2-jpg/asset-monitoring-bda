@@ -1,31 +1,229 @@
-html {
-  font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
+:root {
+    /* Primary theme */
+    --primary-color: #2563EB;
+    --primary-dark: #1E40AF;
+    /* Backgrounds */
+    --page-bg: #F8FAFC;
+    --card-bg: #FFFFFF;
+    --header-bg: #1651b8;
+    --table-header-bg: #2563EB;
+    --table-header-color: #fff;
+    /* Text */
+    --text-primary: #111827;
+    --text-muted: #6B7280;
+    /* Status colors */
+    --status-on: #16A34A;
+    --status-off: #DC2626;
+    --status-maintenance: #F59E0B;
 }
 
 body {
-  margin-bottom: 60px;
+    background: var(--page-bg);
+    margin-bottom: 60px;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.dashboard-navbar {
+    background-color: var(--primary-color);
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+    .dashboard-navbar .navbar-brand,
+    .dashboard-navbar .nav-link {
+        color: #fff !important;
+    }
+
+        .dashboard-navbar .nav-link:hover {
+            color: #E0E7FF !important;
+        }
+
+html {
+    font-size: 14px;
+    position: relative;
+    min-height: 100%;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
+}
+
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: 1rem;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* KPI */
+.kpi-card {
+    background: var(--card-bg);
+    border-radius: 1rem;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+    padding: 1.5rem;
+}
+
+.kpi-title {
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.kpi-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Table */
+.table-dashboard th {
+    background: var(--table-header-bg);
+    color: var(--table-header-color);
+    border: none;
+    font-weight: 700;
+}
+
+.table-dashboard td {
+    border: none;
+    font-size: 1.05rem;
+    vertical-align: middle;
+}
+
+/* Status badges */
+.badge-status-on {
+    background: #e6f9ed;
+    color: var(--status-on);
+    font-weight: 600;
+    border-radius: 16px;
+    padding: .25em 1.1em;
+}
+
+.badge-status-off {
+    background: #f1f5f9;
+    color: var(--status-off);
+    font-weight: 600;
+    border-radius: 16px;
+    padding: .25em 1.1em;
+}
+
+/* Buttons */
+.btn-primary,
+.btn-outline-primary {
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+    .btn-primary:hover {
+        background: var(--primary-dark);
+        border-color: var(--primary-dark);
+    }
+
+/* Smooth animation */
+.transition-col {
+    transition: flex 0.35s ease, max-width 0.35s ease, opacity 0.25s ease;
+}
+
+/* =========================================================
+   DASHBOARD HEIGHT FIX (IMPORTANT PART)
+   ========================================================= */
+
+/* Fixed dashboard height */
+#dashboardRow {
+    min-height: 420px;
+    max-height: 420px;
+}
+
+/* Keep both columns same height */
+#mapCol,
+#tableCol {
+    height: 100%;
+}
+
+    /* Map card fixed */
+    #mapCol .card {
+        height: 100%;
+    }
+
+/* Map itself */
+#map {
+    height: 100%;
+    min-height: 360px;
+}
+
+/* TABLE SCROLL (this fixes expansion issue) */
+#tableCol .card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#tableCol table {
+    flex: 1;
+}
+
+#tableCol tbody {
+    display: block;
+    max-height: 300px; /* controls scroll height */
+    overflow-y: auto;
+}
+
+    #tableCol thead,
+    #tableCol tbody tr {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+    }
+
+/* =========================================================
+   EXPANDED MAP / LIST MODES
+   ========================================================= */
+
+.expand-map #mapCol {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+
+.expand-map #tableCol {
+    display: none;
+}
+
+.expand-list #tableCol {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+
+.expand-list #mapCol {
+    display: none;
+}
+
+/* Expanded height uses viewport */
+#dashboardRow.expand-map,
+#dashboardRow.expand-list {
+    min-height: calc(100vh - 220px);
+    max-height: calc(100vh - 220px);
+}
+
+    #dashboardRow.expand-map .card,
+    #dashboardRow.expand-list .card {
+        height: 100%;
+    }
+
+/* Active view button */
+.view-btn.active {
+    background-color: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd;
 }

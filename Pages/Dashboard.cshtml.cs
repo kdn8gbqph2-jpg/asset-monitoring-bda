@@ -30,19 +30,6 @@ namespace asset_monitoring.Pages
         private readonly UserCacheService _userCache;
         private readonly PumpDashboardService _PumpdashboardService;
 
-
-        public DashboardModel(ApplicationDbContext db, 
-            IConfiguration config, UserCacheService userCache, PumpDashboardService pumpdashboardService)
-        {
-            _db = db;
-            _userCache = userCache;
-            _PumpdashboardService = pumpdashboardService;
-            MapCenterLatitude = config.GetValue<decimal>("MapSettings:CenterLatitude");
-            MapCenterLongitude = config.GetValue<decimal>("MapSettings:CenterLongitude");
-            MapZoom = config.GetValue<int>("MapSettings:Zoom");
-            _PumpdashboardService = pumpdashboardService;
-        }
-
         public int TotalPumps { get; private set; }
         public int RunningPumpCount { get; private set; }
         public string AvgRuntime { get; private set; } = "0 hrs";
@@ -61,7 +48,17 @@ namespace asset_monitoring.Pages
         public int PageNumber { get; set; } = 1;
         public int PageSize { get; set; } = 5;
         public int TotalPages { get; set; }
-        public List<PumpRow> PagedPumps { get; private set; } = new();
+        public DashboardModel(ApplicationDbContext db, 
+            IConfiguration config, UserCacheService userCache, PumpDashboardService pumpdashboardService)
+        {
+            _db = db;
+            _userCache = userCache;
+            _PumpdashboardService = pumpdashboardService;
+            MapCenterLatitude = config.GetValue<decimal>("MapSettings:CenterLatitude");
+            MapCenterLongitude = config.GetValue<decimal>("MapSettings:CenterLongitude");
+            MapZoom = config.GetValue<int>("MapSettings:Zoom");
+            _PumpdashboardService = pumpdashboardService;
+        }
 
         public async Task OnGetAsync(int? pageNumber = 1)
         {
@@ -90,9 +87,6 @@ namespace asset_monitoring.Pages
                 ? $"{(totalRunningMinutes / 60.0 / TotalPumps):0.#} hrs"
                 : "0 hrs";
 
-            PageNumber = pageNumber ?? 1;
-            TotalPages = (int)Math.Ceiling(Pumps.Count / (double)PageSize);
-            PagedPumps = Pumps.Skip((PageNumber - 1) * PageSize).Take(PageSize).ToList();
         }
 
 
@@ -117,7 +111,7 @@ namespace asset_monitoring.Pages
                 return Page();
             }
 
-            // PASSWORD CHECK (plain text version — replace with hash later)
+          
             if (user.Password != LoginModel.Password)
             {
                 Logger.Warn("Login failed (wrong password) for user: {0}", LoginModel.Username);
@@ -126,7 +120,7 @@ namespace asset_monitoring.Pages
                 return Page();
             }
 
-            // Login success
+      
             Logger.Info("Login successful for user: {0}, role={1}", user.Name, user.UserType);
 
             LoginMessage = $"Welcome {user.Name} ({user.UserType})";
@@ -138,6 +132,10 @@ namespace asset_monitoring.Pages
             if (user.UserType == "ADMIN")
             {
                 return RedirectToPage("/Admin");
+            }
+            else if (user.UserType == "OPERATOR")
+            {
+                return RedirectToPage("/Operator");
             }
 
             await OnGetAsync();

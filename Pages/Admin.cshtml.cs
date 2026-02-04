@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace asset_monitoring.Pages
 {
-    public class AdminModel : PageModel
+    public class AdminModel : AppPageModel
     {
         private readonly ApplicationDbContext _context;
         private readonly UserCacheService _userCache;
@@ -32,7 +32,7 @@ namespace asset_monitoring.Pages
         {
             var userType = HttpContext.Session.GetString("UserType");
             IsAdmin = userType == "ADMIN";
-            LoggedInUserName = HttpContext.Session.GetString("UserName"); // Add this line
+            LoggedInUserName = Username;
 
             if (!IsAdmin)
                 return Page();
@@ -66,6 +66,38 @@ namespace asset_monitoring.Pages
         [BindProperty]
         public bool IsActive { get; set; }
 
+        [BindProperty]
+        public EditUserInputModel EditUser { get; set; } = new();
+        public string? Longitude { get; private set; }
+        public string? Latitude { get; private set; }
+
+        public async Task<IActionResult> OnPostUpdateUserAsync()
+        {
+            if (EditUser == null || EditUser.UserId <= 0)
+                return new JsonResult(new { success = false, message = "Invalid input" });
+
+            var rows = await _context.Database.ExecuteSqlRawAsync(
+                "CALL sp_update_user_master({0},{1},{2},{3},{4},{5})",
+                EditUser.UserId,
+                EditUser.Name,
+                EditUser.UserType,   // pass string enum
+                EditUser.MobileNumber,
+                string.IsNullOrWhiteSpace(EditUser.Password)
+                    ? String.Empty
+                    : EditUser.Password,   // hash before this in prod
+                EditUser.IsActive ? 1 : 0
+            );
+
+            if (rows <= 0)
+                return new JsonResult(new { success = false });
+
+            _userCache.Reload();
+
+            return new JsonResult(new { success = true });
+        }
+
+
+
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
             var pump = await _context.BdaPumpMasters.FindAsync(id);
@@ -87,6 +119,8 @@ namespace asset_monitoring.Pages
                 Category,
                 LocationName ?? "",
                 Status ?? "",
+                Latitude??"",
+                Longitude??"",
                 IsActive
             );
             return new JsonResult(new { success = true });
@@ -98,13 +132,14 @@ namespace asset_monitoring.Pages
             var allActivePumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
             return _reportExportService.ExportPumpsAsCsv(allActivePumps);
         }
-
         public IActionResult OnPostLogout()
         {
-            HttpContext.Session.Clear();
-            return RedirectToPage("/Index");
+            return LogoutAndRedirect();
         }
+
     }
+
+
     public class EditUserInputModel
     {
         public int UserId { get; set; }
@@ -112,5 +147,8 @@ namespace asset_monitoring.Pages
         public string UserType { get; set; } = "";
         public string MobileNumber { get; set; } = "";
         public string Password { get; set; } = "";
+        public bool IsActive { get; set; }
     }
+
+
 }

@@ -4,259 +4,175 @@
     ViewData["Title"] = "Admin Panel";
 }
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
-<style>
-    .admin-card {
-        background: #fff;
-        border-radius: 18px;
-        box-shadow: 0 4px 24px 0 rgba(0,0,0,0.06);
-        padding: 2rem 2rem 1.5rem 2rem;
-        margin-bottom: 2.5rem;
-    }
-    .admin-card h5 {
-        font-size: 1.25rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-    }
-    .admin-table th {
-        color: #6b7280;
-        font-weight: 700;
-        background: transparent;
-        border: none;
-        font-size: 1rem;
-        letter-spacing: .02em;
-    }
-    .admin-table td {
-        border: none;
-        font-size: 1.05rem;
-        vertical-align: middle;
-    }
-    .admin-table tr {
-        border-bottom: 1px solid #f0f2f5;
-    }
-    .admin-table tr:last-child {
-        border-bottom: none;
-    }
-    .badge-role {
-        background: #f1f5f9;
-        color: #64748b;
-        font-weight: 600;
-        border-radius: 16px;
-        padding: .25em 1.1em;
-        font-size: .95em;
-    }
-    .badge-status-on {
-        background: #e6f9ed;
-        color: #22c55e;
-        font-weight: 600;
-        border-radius: 16px;
-        padding: .25em 1.1em;
-        font-size: .95em;
-    }
-    .badge-status-off {
-        background: #f1f5f9;
-        color: #64748b;
-        font-weight: 600;
-        border-radius: 16px;
-        padding: .25em 1.1em;
-        font-size: .95em;
-    }
-    .admin-action-btn {
-        background: #f1f5f9;
-        border: none;
-        border-radius: 8px;
-        padding: .4em .7em;
-        margin-right: .3em;
-        color: #2563eb;
-        font-size: 1.1em;
-        transition: background .2s;
-    }
-    .admin-action-btn:last-child {
-        margin-right: 0;
-    }
-    .admin-action-btn.delete {
-        color: #dc2626;
-    }
-    .admin-action-btn:hover {
-        background: #e0e7ef;
-    }
-    .admin-add-btn {
-        background: #2563eb;
-        color: #fff;
-        border: none;
-        border-radius: 10px;
-        padding: .6em 1.5em;
-        font-weight: 600;
-        font-size: 1.05em;
-        transition: background .2s;
-    }
-    .admin-add-btn:hover {
-        background: #1d4ed8;
-    }
-    .admin-toolbar {
-        display: flex;
-        justify-content: flex-end;
-        gap: 1em;
-        margin-bottom: 1em;
-    }
-    .admin-toolbar .btn {
-        font-size: 1em;
-    }
-    .icon-title {
-        color: #2563eb;
-        font-size: 1.3em;
-    }
-</style>
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
 
-<div class="container py-4">
-    <!-- Navigation Buttons -->
-    <div class="d-flex justify-content-end align-items-center mb-4" style="gap: 1rem;"> 
-        <div class="dropdown"> <button class="btn btn-outline-primary dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false"> <i class="bi bi-person-circle">
-        </i> @Model.LoggedInUserName </button> <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown"> <li> <form method="post" asp-page-handler="Logout" class="d-inline"> <button type="submit" class="dropdown-item text-danger"> <i class="bi bi-box-arrow-right"></i> Logout </button> </form> </li> </ul> 
-        </div> 
+<div class="container">
+    <!-- User Dropdown (if not in _Layout) -->
+    <div class="d-flex justify-content-end align-items-center mb-4" style="gap: 1rem;">
+        <div class="dropdown">
+            <button class="btn btn-outline-primary dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-person-circle"></i> @Model.LoggedInUserName
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                <li>
+                    <form method="post" asp-page-handler="Logout" class="d-inline">
+                        <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </button>
+                    </form>
+                </li>
+            </ul>
         </div>
+    </div>
 
     <!-- User Management Card -->
-    <div class="admin-card">
-        <h5>
-            <i class="bi bi-people-fill icon-title"></i>
-            User Management
-        </h5>
-        <div class="admin-toolbar">
-            <button type="button" class="admin-add-btn">
+    <div class="card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-semibold text-primary m-0">
+                <i class="bi bi-people-fill icon-title"></i>
+                User Management
+            </h5>
+            <button type="button" class="btn btn-primary btn-sm admin-add-btn">
                 <i class="bi bi-plus-lg"></i> Add User
             </button>
         </div>
-        <table class="table admin-table">
-            <thead>
-                <tr>
-                    <th>NAME</th>
-                    <th>ROLE</th>
-                    <th>MOBILE NO.</th>
-                    <th>ACTIONS</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var user in Model.Users)
-            {
-                <tr>
-                    <td>@user.Name</td>
-                    <td>
-                        <span class="badge-role">@user.UserType?.ToString().ToUpperInvariant()</span>
-                    </td>
-                    <td>@user.MobileNumber</td>
-                    <td>
-                        <button type="button" class="admin-action-btn" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button type="button" class="admin-action-btn delete" title="Delete">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-dashboard align-middle">
+                <thead>
+                    <tr>
+                        <th>NAME</th>
+                        <th>ROLE</th>
+                        <th>MOBILE NO.</th>
+                        <th>ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var user in Model.Users)
+                {
+                    <tr data-user-id="@user.UserId">
+                        <td class="user-name">@user.Name</td>
+                        <td class="user-role">
+                            <span class="badge-role">@user.UserType?.ToString().ToUpperInvariant()</span>
+                        </td>
+                        <td class="user-mobile">@user.MobileNumber</td>
+                        <td>
+                            <button type="button" class="btn btn-outline-primary btn-sm" title="Edit"
+                                    onclick="openEditUserDrawer('@user.UserId', '@user.Name', '@user.UserType', '@user.MobileNumber', '@user.Password', @user.IsActive)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Pump Inventory Card -->
-    <div class="admin-card">
-        <h5>
-            <i class="bi bi-database-fill icon-title"></i>
-            Pump Inventory
-        </h5>
-        <div class="admin-toolbar">
-            <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='?handler=DownloadReport'">
-                <i class="bi bi-file-earmark-excel"></i> Download Report
-            </button>
-            <button type="button" class="admin-add-btn">
-                <i class="bi bi-plus-lg"></i> Add Pump
-            </button>
+    <div class="card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-semibold text-primary m-0">
+                <i class="bi bi-database-fill icon-title"></i>
+                Pump Inventory
+            </h5>
+            <div>
+                <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="window.location.href='?handler=DownloadReport'">
+                    <i class="bi-file-earmark-excel-fill"></i> Download Report
+                </button>
+                <button type="button" class="btn btn-primary btn-sm admin-add-btn">
+                    <i class="bi bi-plus-lg"></i> Add Pump
+                </button>
+            </div>
         </div>
-        <table class="table admin-table">
-            <thead>
-                <tr>
-                    <th>PUMP ID</th> 
-                    <th>VENDOR</th>
-                    <th>LOCATION</th>
-                    <th>MOBILE</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var pump in Model.Pumps)
-            {
-                <tr>
-                    <td>@pump.PumpId</td> 
-                    <td>@pump.VendorName</td>
-                    <td>@pump.Location</td>
-                    <td>@pump.MobileNumber</td>
-                    <td>
-                        @if (pump.Status == "ON")
-                        {
-                            <span class="badge-status-on">ON</span>
-                        }
-                        else
-                        {
-                            <span class="badge-status-off">@pump.Status</span>
-                        }
-                    </td>
-                    <td>
-                        <!-- Edit button in Pump Inventory table -->
-                        <button type="button"
-                                class="btn btn-outline-primary btn-sm"
-                                title="Edit Pump"
-                                onclick="openeditPumpDrawer('@pump.PumpId')">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-
-                        <form method="post" asp-page-handler="DeletePump" asp-route-id="@pump.PumpId" class="d-inline" onsubmit="return confirm('Delete this pump?');">
-                            <button type="submit" class="admin-action-btn delete" title="Delete">
-                                <i class="bi bi-trash"></i>
+        <div class="table-responsive">
+            <table class="table table-dashboard align-middle">
+                <thead>
+                    <tr>
+                        <th>PUMP ID</th>
+                        <th>VENDOR</th>
+                        <th>LOCATION</th>
+                        <th>MOBILE</th>
+                        <th>STATUS</th>
+                        <th>ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var pump in Model.Pumps)
+                {
+                    <tr>
+                        <td>@pump.PumpId</td>
+                        <td>@pump.VendorName</td>
+                        <td>@pump.Location</td>
+                        <td>@pump.MobileNumber</td>
+                        <td>
+                            @if (pump.Status == "ON")
+                            {
+                                <span class="badge-status-on">ON</span>
+                            }
+                            else
+                            {
+                                <span class="badge-status-off">@pump.Status</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm"
+                                    onclick="openEditPumpDrawer(
+                                        @pump.PumpId,
+                                        '@pump.VendorName',
+                                        '@pump.Location',
+                                        '@pump.Latitude',
+                                        '@pump.Longitude',
+                                        '@pump.Status',
+                                        true
+                                    )">
+                                <i class="bi bi-pencil"></i>
                             </button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+                            <form method="post" asp-page-handler="DeletePump" asp-route-id="@pump.PumpId" class="d-inline" onsubmit="return confirm('Delete this pump?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
-<!-----------Pump Editor drawer--->
+
+<!-- Pump Editor Drawer -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="editPumpDrawer">
     <div class="offcanvas-header">
-        <h5 class="offcanvas-title">Edit Pump</h5>
+        <h5 class="offcanvas-title">
+            <i class="bi bi-pencil-square"></i> Edit Pump
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
-
     <div class="offcanvas-body">
         <form id="editPumpForm">
+            @Html.AntiForgeryToken()
             <input type="hidden" id="editPumpId" />
-
             <div class="mb-3">
                 <label class="form-label">Vendor Name</label>
-                <input class="form-control" id="editVendorName" />
+                <input type="text" class="form-control" id="editVendorName">
             </div>
-
-            <div class="mb-3">
-                <label class="form-label">Category</label>
-                <select class="form-select" id="editCategory">
-                    <option>WATER_PUMP</option>
-                    <option>AGRICULTURE</option>
-                    <option>ELECTRICAL</option>
-                    <option>GOVERNMENT</option>
-                </select>
-            </div>
-
             <div class="mb-3">
                 <label class="form-label">Location</label>
-                <input class="form-control" id="editLocation" />
+                <input type="text" class="form-control" id="editLocationName">
             </div>
-
+            <div class="mb-3">
+                <label class="form-label">Latitude</label>
+                <input type="number" step="any" class="form-control" id="editLatitude">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Longitude</label>
+                <input type="number" step="any" class="form-control" id="editLongitude">
+            </div>
             <div class="mb-3">
                 <label class="form-label">Status</label>
                 <select class="form-select" id="editStatus">
@@ -265,66 +181,59 @@
                     <option value="MAINTENANCE">MAINTENANCE</option>
                 </select>
             </div>
-
-            <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="editPumpActive">
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="editIsActive" checked>
                 <label class="form-check-label">Active</label>
             </div>
-
-            <div class="d-flex justify-content-end gap-2">
-                <button type="button" class="btn btn-secondary"
-                        data-bs-dismiss="offcanvas">
-                    Cancel
-                </button>
-                <button type="button" class="btn btn-primary"
-                        onclick="savePump()">
-                    Save
-                </button>
-            </div>
+            <button type="button" class="btn btn-success w-100" onclick="savePump()">
+                <i class="bi bi-check-circle"></i> Save Changes
+            </button>
         </form>
     </div>
 </div>
-<!-----script------------>
-<script>
-    openEditPumpDrawer(pumpId) {
-        fetch(`/Admin?handler=GetPump&id=${pumpId}`)
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('editPumpId').value = data.pumpId;
-                document.getElementById('editVendorName').value = data.vendorName;
-                document.getElementById('editCategory').value = data.category;
-                document.getElementById('editLocation').value = data.locationName;
-                document.getElementById('editStatus').value = data.status;
-                document.getElementById('editPumpActive').checked = data.isActive;
 
-                // Always re-initialize to avoid stale instance
-                const drawerElem = document.getElementById('editPumpDrawer');
-                const editPumpCanvas = new bootstrap.Offcanvas(drawerElem);
-                editPumpCanvas.show();
-            });
-    }
+<!-- Update User Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="editUserDrawer">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title">
+            <i class="bi bi-pencil-square"></i> Edit User
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form id="editUserForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="editUserId" />
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-control" id="editUserName" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Role</label>
+                <select class="form-select" id="editUserRole">
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="OPERATOR">OPERATOR</option>
+                    <option value="BDA_OFFICIAL">BDA_OFFICIAL</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Mobile Number</label>
+                <input type="text" class="form-control" id="editUserMobile" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-control" id="editUserPassword" />
+            </div>
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="editUserActive" checked>
+                <label class="form-check-label">Active</label>
+            </div>
+            <button type="button" class="btn btn-success w-100" onclick="saveUser()">
+                <i class="bi bi-check-circle"></i> Save Changes
+            </button>
+        </form>
+    </div>
+</div>
 
-    function savePump() {
-        const payload = {
-            PumpId: document.getElementById('editPumpId').value,
-            VendorName: document.getElementById('editVendorName').value,
-            Category: document.getElementById('editCategory').value,
-            LocationName: document.getElementById('editLocation').value,
-            Status: document.getElementById('editStatus').value,
-            IsActive: document.getElementById('editPumpActive').checked
-        };
 
-        fetch('/Admin?handler=UpdatePump', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(res => {
-            if (res.ok) {
-                editPumpCanvas.hide();
-                location.reload();
-            }
-        });
-    }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 

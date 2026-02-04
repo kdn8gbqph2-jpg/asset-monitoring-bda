@@ -14,7 +14,7 @@ namespace asset_monitoring.Services
             _db = db;
         }
 
-        public async Task<List<DashboardPumpDto>> GetPumpsAsync(string? username = null)
+        public async Task<List<DashboardPumpDto>> GetPumpsAsync(string? username = null, string? user_type = "ADMIN")
         {
             var pumps = new List<DashboardPumpDto>();
 
@@ -28,6 +28,8 @@ namespace asset_monitoring.Services
 
             cmd.Parameters.Add(new MySqlParameter("@p_username",
                 string.IsNullOrWhiteSpace(username) ? DBNull.Value : username));
+            cmd.Parameters.Add(new MySqlParameter("@p_user_type",
+                string.IsNullOrWhiteSpace(user_type) ? DBNull.Value : user_type));
 
             await using var reader = await cmd.ExecuteReaderAsync();
 
@@ -43,7 +45,7 @@ namespace asset_monitoring.Services
                     Status = reader["pump_status"]?.ToString(),
                     RunningMinutes = Convert.ToInt32(reader["running_time_minutes"]),
                     LastUpdated = Convert.ToDateTime(reader["last_updated_time"]),
-                    MobileNumber = reader["mobile_number"]?.ToString()
+                    MobileNumber = reader["operator_mobile"]?.ToString()
                 });
             }
 
@@ -56,6 +58,8 @@ namespace asset_monitoring.Services
             string? category,
             string locationName,
             string status,
+            string latitude,
+            string longitude,
             bool isActive)
         {
             await using var conn = new MySqlConnection(_db.Database.GetConnectionString());
@@ -71,6 +75,8 @@ namespace asset_monitoring.Services
             cmd.Parameters.AddWithValue("p_category", category ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("p_location_name", locationName);
             cmd.Parameters.AddWithValue("p_status", status);
+            cmd.Parameters.AddWithValue("p_latitude", latitude);
+            cmd.Parameters.AddWithValue("p_longitude", longitude);
             cmd.Parameters.AddWithValue("p_is_active", isActive ? 1 : 0);
 
             await cmd.ExecuteNonQueryAsync();
