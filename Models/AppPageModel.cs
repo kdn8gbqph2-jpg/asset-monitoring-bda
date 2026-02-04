@@ -11,6 +11,9 @@ namespace asset_monitoring.Models
         public string? UserType =>
             HttpContext.Session.GetString("UserType");
 
+        public int? UserId =>
+           HttpContext.Session.GetInt32("UserId");
+
         public bool IsLoggedIn =>
             !string.IsNullOrEmpty(Username);
 

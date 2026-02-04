@@ -2,6 +2,7 @@
 {
     public class ActiveUsers
     {
+        public int UserId { get; set; } = new();
         public string Name { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
         public string UserType { get; set; } = string.Empty;

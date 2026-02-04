@@ -1,7 +1,4 @@
-﻿@* Pump Drawer Partial *@
-@* This partial can be included in any page with @await Html.PartialAsync("_PumpDrawer") *@
-
-<div class="offcanvas offcanvas-end" tabindex="-1" id="editPumpDrawer">
+﻿<div class="offcanvas offcanvas-end" tabindex="-1" id="editPumpDrawer">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title">
             <i class="bi bi-pencil-square"></i> Edit Pump
@@ -12,27 +9,22 @@
         <form id="editPumpForm">
             @Html.AntiForgeryToken()
             <input type="hidden" id="editPumpId" />
-
             <div class="mb-3">
                 <label class="form-label">Vendor Name</label>
                 <input type="text" class="form-control" id="editVendorName">
             </div>
-
             <div class="mb-3">
                 <label class="form-label">Location</label>
                 <input type="text" class="form-control" id="editLocationName">
             </div>
-
             <div class="mb-3">
                 <label class="form-label">Latitude</label>
                 <input type="number" step="any" class="form-control" id="editLatitude">
             </div>
-
             <div class="mb-3">
                 <label class="form-label">Longitude</label>
                 <input type="number" step="any" class="form-control" id="editLongitude">
             </div>
-
             <div class="mb-3">
                 <label class="form-label">Status</label>
                 <select class="form-select" id="editStatus">
@@ -41,12 +33,10 @@
                     <option value="MAINTENANCE">MAINTENANCE</option>
                 </select>
             </div>
-
-            <div class="form-check mb-3">
+@*             <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" id="editIsActive" checked>
                 <label class="form-check-label">Active</label>
-            </div>
-
+            </div> *@
             <button type="button" class="btn btn-success w-100" onclick="savePump()">
                 <i class="bi bi-check-circle"></i> Save Changes
             </button>

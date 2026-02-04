@@ -33,7 +33,7 @@ namespace asset_monitoring.Data
             {
                 entity.HasNoKey();
                 entity.ToView(null); // IMPORTANT for stored procedure
-
+                entity.Property(e => e.UserId).HasColumnName("user_id");
                 entity.Property(e => e.Name).HasColumnName("name");
                 entity.Property(e => e.UserName).HasColumnName("userName");
                 entity.Property(e => e.UserType).HasColumnName("user_type");

@@ -1,6 +1,7 @@
 using asset_monitoring.Data;
 using asset_monitoring.Models;
 using asset_monitoring.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +30,7 @@ namespace asset_monitoring.Pages
 
         private readonly UserCacheService _userCache;
         private readonly PumpDashboardService _PumpdashboardService;
-
+        private readonly ReportExportService _reportExportService;
         public int TotalPumps { get; private set; }
         public int RunningPumpCount { get; private set; }
         public string AvgRuntime { get; private set; } = "0 hrs";
@@ -44,12 +45,11 @@ namespace asset_monitoring.Pages
         public decimal MapCenterLatitude { get; private set; }
         public decimal MapCenterLongitude { get; private set; }
         public int MapZoom { get; private set; }
-
-        public int PageNumber { get; set; } = 1;
-        public int PageSize { get; set; } = 5;
-        public int TotalPages { get; set; }
         public DashboardModel(ApplicationDbContext db, 
-            IConfiguration config, UserCacheService userCache, PumpDashboardService pumpdashboardService)
+            IConfiguration config, UserCacheService userCache, 
+            PumpDashboardService pumpdashboardService,
+            ReportExportService reportExportService
+            )
         {
             _db = db;
             _userCache = userCache;
@@ -58,13 +58,14 @@ namespace asset_monitoring.Pages
             MapCenterLongitude = config.GetValue<decimal>("MapSettings:CenterLongitude");
             MapZoom = config.GetValue<int>("MapSettings:Zoom");
             _PumpdashboardService = pumpdashboardService;
+            _reportExportService = reportExportService;
         }
 
-        public async Task OnGetAsync(int? pageNumber = 1)
+        public async Task OnGetAsync()
         {
             Logger.Info("Dashboard OnGetAsync started");
 
-            var pumpData = await _PumpdashboardService.GetPumpsAsync(LoginModel.Username);
+            var pumpData = await _PumpdashboardService.GetPumpsAsync();
 
             Pumps = pumpData.Select(p => new PumpRow
             {
@@ -124,7 +125,7 @@ namespace asset_monitoring.Pages
             Logger.Info("Login successful for user: {0}, role={1}", user.Name, user.UserType);
 
             LoginMessage = $"Welcome {user.Name} ({user.UserType})";
-
+            HttpContext.Session.SetInt32("UserId", user.UserId);
             HttpContext.Session.SetString("UserName", user.Name);
             HttpContext.Session.SetString("UserType", user.UserType);
             HttpContext.Session.SetString("Mobile", user.MobileNumber);
@@ -167,7 +168,12 @@ namespace asset_monitoring.Pages
             public DateTime? LastRun { get; init; }
             public string? MobileNumber { get; init; } // <-- Add this line
         }
+        public IActionResult OnGetDownloadReport()
+        {
 
+            var allActivePumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsCsv(allActivePumps);
+        }
         public class LoginInputModel
         {
             public string Username { get; set; } = "";

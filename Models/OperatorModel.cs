@@ -24,7 +24,7 @@ namespace asset_monitoring.Pages
         public async Task<IActionResult> OnGetAsync()
         {
             LoggedInUserName = Username;
-            Pumps = await _pumpDashboardService.GetPumpsAsync(Username, UserType);
+            Pumps = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
             return Page();
         }
 
@@ -79,7 +79,7 @@ namespace asset_monitoring.Pages
 
         public IActionResult OnGetDownloadReport()
         {
-            var allActivePumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            var allActivePumps = _pumpDashboardService.GetPumpsAsync(UserId, UserType).GetAwaiter().GetResult();
             return _reportExportService.ExportPumpsAsCsv(allActivePumps);
         }
     }

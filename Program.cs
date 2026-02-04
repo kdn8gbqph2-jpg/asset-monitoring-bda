@@ -41,10 +41,12 @@ try
     logger.Info("Current connection string :" + connectionString);
 
     //Services
+    builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<UserCacheService>();
     builder.Services.AddScoped<PumpDashboardService>();
     builder.Services.AddScoped<ReportExportService>();
     builder.Services.AddScoped<UserService>();
+   
 
     builder.Services.AddSession(options =>
     {

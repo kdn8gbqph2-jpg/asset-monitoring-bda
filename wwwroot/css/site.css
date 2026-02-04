@@ -227,3 +227,12 @@ html {
     color: #fff;
     border-color: #0d6efd;
 }
+.dashboard-title {
+    font-size: 1.75rem; 
+}
+
+@media (max-width: 768px) {
+    .dashboard-title {
+        font-size: 1.4rem;
+    }
+}

@@ -6,7 +6,7 @@
     document.getElementById("editStatus").value = status ?? "OFF";
     document.getElementById("editLatitude").value = latitude ?? "";
     document.getElementById("editLongitude").value = longitude ?? "";
-    document.getElementById("editIsActive").checked = isActive;
+    /*document.getElementById("editIsActive").checked = isActive;*/
 
     const drawerEl = document.getElementById("editPumpDrawer");
     editDrawer = bootstrap.Offcanvas.getInstance(drawerEl)
@@ -33,7 +33,7 @@
     Latitude: parseFloat(document.getElementById("editLatitude").value),
     Longitude: parseFloat(document.getElementById("editLongitude").value),
     Status: document.getElementById("editStatus").value,
-    IsActive: document.getElementById("editIsActive").checked
+    /*IsActive: document.getElementById("editIsActive").checked*/
             })
         })
         .then(res => res.json())

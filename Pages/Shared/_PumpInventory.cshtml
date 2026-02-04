@@ -1,0 +1,83 @@
+﻿@model IEnumerable<asset_monitoring.Services.DashboardPumpDto>
+
+<div class="card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-semibold text-primary m-0">
+            <i class="bi bi-database-fill icon-title"></i>
+            Pump Inventory
+        </h5>
+
+        <div>
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm me-2"
+                    onclick="window.location.href='?handler=DownloadReport'">
+                <i class="bi bi-file-earmark-excel"></i> Download Report
+            </button>
+
+            <button type="button" class="btn btn-primary btn-sm admin-add-btn">
+                <i class="bi bi-plus-lg"></i> Add Pump
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-dashboard align-middle">
+            <thead>
+                <tr>
+                    <th>PUMP ID</th>
+                    <th>VENDOR</th>
+                    <th>LOCATION</th>
+                    <th>MOBILE</th>
+                    <th>STATUS</th>
+                    <th>ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pump in Model)
+                {
+                    <tr>
+                        <td>@pump.PumpId</td>
+                        <td>@pump.VendorName</td>
+                        <td>@pump.Location</td>
+                        <td>@pump.MobileNumber</td>
+                        <td>
+                            @if (pump.Status == "ON")
+                            {
+                                <span class="badge-status-on">ON</span>
+                            }
+                            else
+                            {
+                                <span class="badge-status-off">@pump.Status</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm"
+                                    onclick="openEditPumpDrawer(
+                                        @pump.PumpId,
+                                        '@pump.VendorName',
+                                        '@pump.Location',
+                                        '@pump.Status',
+                                        @pump.Latitude,
+                                        @pump.Longitude,
+                                        true
+                                    )">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+
+                            <form method="post"
+                                  asp-page-handler="DeletePump"
+                                  asp-route-id="@pump.PumpId"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Delete this pump?');">
+                                <button type="submit"
+                                        class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
