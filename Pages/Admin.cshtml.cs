@@ -4,11 +4,14 @@ using asset_monitoring.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using NLog;
 
 namespace asset_monitoring.Pages
 {
     public class AdminModel : AppPageModel
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         private readonly ApplicationDbContext _context;
         private readonly UserCacheService _userCache;
         private readonly PumpDashboardService _pumpDashboardService;
@@ -35,7 +38,12 @@ namespace asset_monitoring.Pages
             LoggedInUserName = Username;
 
             if (!IsAdmin)
+            {
+                Logger.Warn("OnGetAsync: non-admin access attempt by user={0}, userType={1}", Username, userType);
                 return Page();
+            }
+
+            Logger.Info("OnGetAsync: admin page loaded by user={0}", Username);
 
             Users = await _context.BdaUserMasters
                 .AsNoTracking()
@@ -49,6 +57,7 @@ namespace asset_monitoring.Pages
                 .AsNoTracking()
                 .ToListAsync();
 
+            Logger.Debug("OnGetAsync: loaded {0} users, {1} pumps for admin", Users.Count, Pumps.Count);
             return Page();
         }
 
@@ -67,73 +76,101 @@ namespace asset_monitoring.Pages
         public bool IsActive { get; set; }
 
         [BindProperty]
+        public string? Latitude { get; set; }
+        [BindProperty]
+        public string? Longitude { get; set; }
+
+        [BindProperty]
         public EditUserInputModel EditUser { get; set; } = new();
-        public string? Longitude { get; private set; }
-        public string? Latitude { get; private set; }
 
         public async Task<IActionResult> OnPostUpdateUserAsync()
         {
             if (EditUser == null || EditUser.UserId <= 0)
+            {
+                Logger.Warn("OnPostUpdateUserAsync: invalid input received, userId={0}", EditUser?.UserId);
                 return new JsonResult(new { success = false, message = "Invalid input" });
+            }
 
-            var rows = await _context.Database.ExecuteSqlRawAsync(
-                "CALL sp_update_user_master({0},{1},{2},{3},{4},{5})",
-                EditUser.UserId,
-                EditUser.Name,
-                EditUser.UserType,   // pass string enum
-                EditUser.MobileNumber,
-                string.IsNullOrWhiteSpace(EditUser.Password)
-                    ? String.Empty
-                    : EditUser.Password,   // hash before this in prod
-                EditUser.IsActive ? 1 : 0
-            );
+            Logger.Info("OnPostUpdateUserAsync: updating userId={0}, name={1}, userType={2} by admin={3}",
+                EditUser.UserId, EditUser.Name, EditUser.UserType, Username);
 
-            if (rows <= 0)
-                return new JsonResult(new { success = false });
+            try
+            {
+                var rows = await _context.Database.ExecuteSqlRawAsync(
+                    "CALL sp_update_user_master({0},{1},{2},{3},{4},{5})",
+                    EditUser.UserId,
+                    EditUser.Name,
+                    EditUser.UserType,   // pass string enum
+                    EditUser.MobileNumber,
+                    string.IsNullOrWhiteSpace(EditUser.Password)
+                        ? String.Empty
+                        : EditUser.Password,   // hash before this in prod
+                    EditUser.IsActive ? 1 : 0
+                );
 
-            _userCache.Reload();
+                if (rows <= 0)
+                {
+                    Logger.Warn("OnPostUpdateUserAsync: sp_update_user_master affected 0 rows for userId={0}", EditUser.UserId);
+                    return new JsonResult(new { success = false });
+                }
 
-            return new JsonResult(new { success = true });
+                _userCache.Reload();
+                Logger.Info("OnPostUpdateUserAsync: userId={0} updated successfully, user cache reloaded", EditUser.UserId);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostUpdateUserAsync failed for userId={0}", EditUser.UserId);
+                return new JsonResult(new { success = false, message = "An error occurred" });
+            }
         }
 
 
 
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
-            var pump = await _context.BdaPumpMasters.FindAsync(id);
-            if (pump != null)
-            {
-                // Soft delete if you have IsActive, else remove
-                pump.IsActive = false;
-                _context.BdaPumpMasters.Update(pump);
-                await _context.SaveChangesAsync();
-            }
+            Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by admin={1}", id, Username);
+            await _pumpDashboardService.DeletePumpAsync(id);
             return RedirectToPage();
         }
 
         public async Task<IActionResult> OnPostUpdatePumpAsync()
         {
-            await _pumpDashboardService.UpdatePumpDetailsAsync(
-                PumpId,
-                VendorName ?? "",
-                Category,
-                LocationName ?? "",
-                Status ?? "",
-                Latitude??"",
-                Longitude??"",
-                IsActive
-            );
-            return new JsonResult(new { success = true });
+            Logger.Info("OnPostUpdatePumpAsync: updating pumpId={0} by admin={1}", PumpId, Username);
+
+            try
+            {
+                await _pumpDashboardService.UpdatePumpDetailsAsync(
+                    PumpId,
+                    VendorName ?? "",
+                    Category,
+                    LocationName ?? "",
+                    Status ?? "",
+                    Latitude ?? "",
+                    Longitude ?? "",
+                    IsActive
+                );
+                Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", PumpId);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostUpdatePumpAsync failed for pumpId={0}", PumpId);
+                return new JsonResult(new { success = false, message = "Update failed" });
+            }
         }
 
         public IActionResult OnGetDownloadReport()
         {
-            // Always fetch fresh data for all active pumps
+            Logger.Info("OnGetDownloadReport: report download requested by admin={0}", Username);
             var allActivePumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            Logger.Info("OnGetDownloadReport: exporting {0} pumps to CSV", allActivePumps.Count);
             return _reportExportService.ExportPumpsAsCsv(allActivePumps);
         }
+
         public IActionResult OnPostLogout()
         {
+            Logger.Info("OnPostLogout: admin={0} logged out", Username);
             return LogoutAndRedirect();
         }
 

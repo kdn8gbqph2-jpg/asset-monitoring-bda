@@ -1,21 +1,20 @@
-using asset_monitoring.Data;
 using asset_monitoring.Services;
 using asset_monitoring.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
+using NLog;
 
 namespace asset_monitoring.Pages
 {
     public class OperatorModel : AppPageModel
     {
-        private readonly ApplicationDbContext _context;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         private readonly PumpDashboardService _pumpDashboardService;
         private readonly ReportExportService _reportExportService;
         public string? LoggedInUserName { get; set; }
-        public OperatorModel(ApplicationDbContext context, PumpDashboardService pumpDashboardService, ReportExportService reportExportService)
+        public OperatorModel(PumpDashboardService pumpDashboardService, ReportExportService reportExportService)
         {
-            _context = context;
             _pumpDashboardService = pumpDashboardService;
             _reportExportService = reportExportService;
         }
@@ -24,7 +23,9 @@ namespace asset_monitoring.Pages
         public async Task<IActionResult> OnGetAsync()
         {
             LoggedInUserName = Username;
+            Logger.Info("OnGetAsync: operator page loaded for userId={0}, user={1}", UserId, Username);
             Pumps = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
+            Logger.Debug("OnGetAsync: loaded {0} pumps for operator userId={1}", Pumps.Count, UserId);
             return Page();
         }
 
@@ -48,38 +49,48 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostUpdatePumpAsync()
         {
-            await _pumpDashboardService.UpdatePumpDetailsAsync(
-                PumpId,
-                VendorName ?? "",
-                Category,
-                LocationName ?? "",
-                Status ?? "",
-                Latitude,
-                Longitude,
-                IsActive
-            );
-            return new JsonResult(new { success = true });
+            Logger.Info("OnPostUpdatePumpAsync: updating pumpId={0} by operator userId={1}", PumpId, UserId);
+
+            try
+            {
+                await _pumpDashboardService.UpdatePumpDetailsAsync(
+                    PumpId,
+                    VendorName ?? "",
+                    Category,
+                    LocationName ?? "",
+                    Status ?? "",
+                    Latitude,
+                    Longitude,
+                    IsActive
+                );
+                Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", PumpId);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostUpdatePumpAsync failed for pumpId={0}", PumpId);
+                return new JsonResult(new { success = false, message = "Update failed" });
+            }
         }
+
         public IActionResult OnPostLogout()
         {
-           return LogoutAndRedirect(); //base
+            Logger.Info("OnPostLogout: operator userId={0}, user={1} logged out", UserId, Username);
+            return LogoutAndRedirect();
         }
 
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
-            var pump = await _context.BdaPumpMasters.FindAsync(id);
-            if (pump != null)
-            {
-                pump.IsActive = false;
-                _context.BdaPumpMasters.Update(pump);
-                await _context.SaveChangesAsync();
-            }
+            Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by operator userId={1}", id, UserId);
+            await _pumpDashboardService.DeletePumpAsync(id);
             return RedirectToPage();
         }
 
         public IActionResult OnGetDownloadReport()
         {
+            Logger.Info("OnGetDownloadReport: report download requested by operator userId={0}", UserId);
             var allActivePumps = _pumpDashboardService.GetPumpsAsync(UserId, UserType).GetAwaiter().GetResult();
+            Logger.Info("OnGetDownloadReport: exporting {0} pumps to CSV", allActivePumps.Count);
             return _reportExportService.ExportPumpsAsCsv(allActivePumps);
         }
     }

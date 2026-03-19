@@ -84,17 +84,32 @@ html {
 }
 
 /* Table */
+.table-dashboard {
+    border-collapse: collapse;
+    table-layout: auto;
+    width: 100%;
+}
+
 .table-dashboard th {
-    background: var(--table-header-bg);
-    color: var(--table-header-color);
-    border: none;
+    background-color: var(--table-header-bg) !important;
+    --bs-table-bg: var(--table-header-bg);
+    color: var(--table-header-color) !important;
     font-weight: 700;
+    border: 1px solid #1d4ed8;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .table-dashboard td {
-    border: none;
+    border: 1px solid #dee2e6;
     font-size: 1.05rem;
     vertical-align: middle;
+}
+
+.table-dashboard tbody tr:hover {
+    background-color: #f0f6ff;
 }
 
 /* Status badges */
@@ -155,6 +170,14 @@ html {
     /* Map card fixed */
     #mapCol .card {
         height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #mapCol .card-body {
+        flex: 1;
+        min-height: 0;
+        padding: 0;
     }
 
 /* Map itself */
@@ -163,29 +186,26 @@ html {
     min-height: 360px;
 }
 
-/* TABLE SCROLL (this fixes expansion issue) */
+/* Expand map mode — map fills viewport */
+#dashboardRow.expand-map #map {
+    height: calc(100vh - 280px);
+    min-height: 400px;
+}
+
+/* TABLE SCROLL */
 #tableCol .card {
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    overflow: hidden;
 }
 
-#tableCol table {
-    flex: 1;
+#tableCol .table-responsive {
+    overflow: auto;
+    max-height: 350px;
 }
 
-#tableCol tbody {
-    display: block;
-    max-height: 300px; /* controls scroll height */
-    overflow-y: auto;
+#dashboardRow.expand-list #tableCol .table-responsive {
+    max-height: calc(100vh - 280px);
 }
-
-    #tableCol thead,
-    #tableCol tbody tr {
-        display: table;
-        width: 100%;
-        table-layout: fixed;
-    }
 
 /* =========================================================
    EXPANDED MAP / LIST MODES
