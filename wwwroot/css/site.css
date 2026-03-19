@@ -63,25 +63,74 @@ html {
     margin-bottom: 1.5rem;
 }
 
+/* ── Dark navbar ─────────────────────────────────────────────────────── */
+.dash-navbar {
+    background: #0f172a;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.dash-navbar .nav-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.dash-navbar .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+.dash-navbar .btn-nav {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 8px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dash-navbar .btn-nav:hover { background: rgba(255,255,255,0.2); }
+
+.dash-navbar .btn-nav-primary {
+    background: #2563EB;
+    border-color: #2563EB;
+}
+
+.dash-navbar .btn-nav-primary:hover { background: #1d4ed8; }
+
 /* KPI */
 .kpi-card {
-    background: var(--card-bg);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
     box-shadow: 0 1px 8px rgba(0,0,0,0.06);
-    padding: 1.5rem;
+    background: #fff;
+    border-left: 4px solid var(--kpi-color, #2563EB);
 }
 
 .kpi-title {
-    color: var(--primary-color);
+    font-size: 0.85rem;
     font-weight: 600;
-    font-size: 1.1rem;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .kpi-value {
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 700;
     color: var(--text-primary);
+    line-height: 1.2;
 }
+
+.kpi-card.kpi-blue  { --kpi-color: #2563EB; }
+.kpi-card.kpi-green { --kpi-color: #16A34A; }
+.kpi-card.kpi-red   { --kpi-color: #DC2626; }
+.kpi-card.kpi-yellow{ --kpi-color: #F59E0B; }
 
 /* Table */
 .table-dashboard {
@@ -371,7 +420,7 @@ html {
     transform: scale(0.96);
 }
 .dashboard-title {
-    font-size: 1.75rem; 
+    font-size: 1.75rem;
 }
 
 @media (max-width: 768px) {
@@ -379,3 +428,32 @@ html {
         font-size: 1.4rem;
     }
 }
+
+/* ── Status dots ─────────────────────────────────────────────────────── */
+.status-dot { font-size: 0.6rem; margin-right: 4px; vertical-align: middle; }
+.dot-on   { color: #16A34A; }
+.dot-off  { color: #DC2626; }
+.dot-maint{ color: #F59E0B; }
+
+/* ── Row flash animation (status change) ─────────────────────────────── */
+@keyframes rowFlash {
+    0%   { background-color: #fef9c3; }
+    50%  { background-color: #fde68a; }
+    100% { background-color: transparent; }
+}
+
+.row-flash {
+    animation: rowFlash 2s ease-out forwards;
+}
+
+/* ── Column resize handle ────────────────────────────────────────────── */
+.col-resizer {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 10;
+}
+
+.col-resizer:hover { background: rgba(255,255,255,0.4); }

@@ -33,6 +33,8 @@ namespace asset_monitoring.Pages
         private readonly ReportExportService _reportExportService;
         public int TotalPumps { get; private set; }
         public int RunningPumpCount { get; private set; }
+        public int OfflinePumpCount { get; private set; }
+        public int MaintenancePumpCount { get; private set; }
         public string AvgRuntime { get; private set; } = "0 hrs";
 
         public List<PumpRow> Pumps { get; private set; } = new();
@@ -86,6 +88,8 @@ namespace asset_monitoring.Pages
 
             TotalPumps = Pumps.Count;
             RunningPumpCount = pumpData.Count(p => p.Status == "ON");
+            OfflinePumpCount = pumpData.Count(p => p.Status == "OFF");
+            MaintenancePumpCount = pumpData.Count(p => p.Status == "MAINTENANCE");
 
             double totalRunningMinutes = pumpData.Sum(p => p.RunningMinutes);
             AvgRuntime = TotalPumps > 0
@@ -160,6 +164,8 @@ namespace asset_monitoring.Pages
             {
                 totalPumps = TotalPumps,
                 runningNow = RunningPumpCount,
+                offlineCount = OfflinePumpCount,
+                maintenanceCount = MaintenancePumpCount,
                 avgRuntime = AvgRuntime,
                 pumps = Pumps
             });

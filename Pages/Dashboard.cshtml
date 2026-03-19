@@ -6,71 +6,66 @@
 
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-<!-- ================= HEADER ================= -->
-<div class="container">
-    <div class="container mb-4">
-        <div class="row align-items-center">
-
-            <!-- LEFT -->
-            <div class="col-4 d-flex align-items-center gap-2">
-                <button class="btn btn-outline-primary">EN / HI</button>
-                <button class="btn btn-outline-primary"
-                        onclick="window.location.href='?handler=DownloadReport'">
-                    <i class="bi bi-download"></i>
-                </button>
-            </div>
-
-            <!-- CENTER -->
-            <div class="col-4 text-center">
-                <h2 class="fw-bold text-primary m-0 dashboard-title">
-                    Monsoon Pump Dashboard
-                </h2>
-            </div>
-
-            <!-- RIGHT -->
-            <div class="col-4 d-flex justify-content-end">
-                <button class="btn btn-outline-primary d-flex align-items-center gap-2 px-3 py-2"
-                        data-bs-toggle="modal"
-                        data-bs-target="#loginModal">
-                    <img src="~/images/user-logo.png"
-                         alt="User"
-                         style="height:28px;width:28px;" />
-                    <span class="fw-semibold">Sign in</span>
-                </button>
-            </div>
-
-        </div>
+<!-- ================= DARK NAVBAR ================= -->
+<div class="dash-navbar">
+    <div class="nav-actions">
+        <button class="btn-nav">EN / HI</button>
+        <button class="btn-nav" onclick="window.location.href='?handler=DownloadReport'">
+            <i class="bi bi-download"></i>
+        </button>
     </div>
+    <div class="nav-title">Monsoon Pump Dashboard</div>
+    <div class="nav-actions">
+        <button class="btn-nav btn-nav-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#loginModal">
+            <img src="~/images/user-logo.png"
+                 alt="User"
+                 style="height:22px;width:22px;filter:brightness(0) invert(1);vertical-align:middle;" />
+            <span style="vertical-align:middle;">Sign in</span>
+        </button>
+    </div>
+</div>
 
+<div class="container">
 
     <!-- ================= KPI SECTION ================= -->
     <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="kpi-card">
+        <div class="col-6 col-md-3">
+            <div class="kpi-card kpi-blue">
                 <div class="kpi-title">Total Pumps</div>
                 <div class="kpi-value">@Model.TotalPumps</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="kpi-card">
-                <div class="kpi-title">Running Now</div>
-                <div class="kpi-value text-success">@Model.RunningPumpCount</div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card kpi-green">
+                <div class="kpi-title">Running</div>
+                <div class="kpi-value">@Model.RunningPumpCount</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="kpi-card">
-                <div class="kpi-title">Total Runtime</div>
-                <div class="kpi-value">@Model.AvgRuntime</div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card kpi-red">
+                <div class="kpi-title">Offline</div>
+                <div class="kpi-value">@Model.OfflinePumpCount</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card kpi-yellow">
+                <div class="kpi-title">Maintenance</div>
+                <div class="kpi-value">@Model.MaintenancePumpCount</div>
             </div>
         </div>
     </div>
 
     <!-- ================= MAP / LIST TOGGLE ================= -->
     <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
             <button class="btn btn-primary btn-sm view-btn" id="btnMap">
                 <i class="bi bi-map"></i> Map View
             </button>
@@ -81,8 +76,11 @@
                 <i class="bi bi-arrow-counterclockwise"></i> Reset
             </button>
         </div>
-        <div id="activeFiltersBar" class="d-none small text-muted fst-italic">
-            <!-- shows active filter / sort hints -->
+        <div class="d-flex align-items-center gap-3">
+            <span id="lastUpdatedLabel" class="small text-muted fst-italic">Just now</span>
+            <div id="activeFiltersBar" class="d-none small text-muted fst-italic">
+                <!-- shows active filter / sort hints -->
+            </div>
         </div>
     </div>
 
@@ -97,6 +95,10 @@
         </div>
         <div class="col-12 col-md-6" id="tableCol">
             <div class="card h-100 d-flex flex-column">
+                <div class="px-3 pt-3 pb-2">
+                    <input type="search" id="tableSearch" class="form-control form-control-sm"
+                           placeholder="🔍 Search pumps…" />
+                </div>
                 <div class="table-responsive">
                 <table class="table table-dashboard mb-0 align-middle">
                     <thead>
@@ -158,15 +160,15 @@
                                 <td class="col-sticky-right">
                                     @if (p.Status == "ON")
                                     {
-                                        <span class="badge-status-on">ON</span>
+                                        <span class="status-dot dot-on">●</span><span class="badge-status-on">ON</span>
                                     }
                                     else if (p.Status == "OFF")
                                     {
-                                        <span class="badge-status-off">OFF</span>
+                                        <span class="status-dot dot-off">●</span><span class="badge-status-off">OFF</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-warning text-dark">MAINTENANCE</span>
+                                        <span class="status-dot dot-maint">●</span><span class="badge bg-warning text-dark">MAINTENANCE</span>
                                     }
                                 </td>
                             </tr>
@@ -175,7 +177,7 @@
                 </table>
                 </div><!-- /table-responsive -->
                 <!-- Fixed footer — sits at the bottom of the card regardless of scroll -->
-                <div class="d-flex justify-content-end pt-2 flex-shrink-0">
+                <div class="d-flex justify-content-end pt-2 flex-shrink-0 px-3 pb-3">
                     <button class="btn btn-primary btn-sm">
                         <i class="bi bi-exclamation-circle"></i> Report Issue
                     </button>
@@ -281,6 +283,8 @@
     <script>
         let map;
         let markersLayer;
+        let lastRefreshTime = Date.now();
+        const prevStatuses = {};
 
         document.addEventListener("DOMContentLoaded", () => {
             initLeafletMap();
@@ -297,7 +301,7 @@
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
 
-            markersLayer = L.layerGroup().addTo(map);
+            markersLayer = L.markerClusterGroup({ maxClusterRadius: 60 }).addTo(map);
 
             loadPumpMarkers();
         }
@@ -309,10 +313,26 @@
                     markersLayer.clearLayers();
 
                     data.pumps.forEach(p => {
+                        // Row flash on status change
+                        if (prevStatuses[p.pumpId] !== undefined && prevStatuses[p.pumpId] !== p.status) {
+                            const rows = document.querySelectorAll('.table-dashboard tbody tr');
+                            rows.forEach(tr => {
+                                if (tr.cells[0] && tr.cells[0].textContent.trim() === String(p.pumpId)) {
+                                    tr.classList.remove('row-flash');
+                                    void tr.offsetWidth; // force reflow
+                                    tr.classList.add('row-flash');
+                                    setTimeout(() => tr.classList.remove('row-flash'), 2000);
+                                }
+                            });
+                        }
+                        prevStatuses[p.pumpId] = p.status;
+
                         if (p.latitude && p.longitude) {
                             addPumpMarker(p);
                         }
                     });
+
+                    lastRefreshTime = Date.now();
                 })
                 .catch(err => console.error("Map data load failed", err));
         }
@@ -351,7 +371,22 @@
             });
         }
 
+        // Auto-refresh every 30s
         setInterval(loadPumpMarkers, 30000);
+
+        // Live "last updated" label — updates every 15s
+        setInterval(function () {
+            const elapsed = Math.floor((Date.now() - lastRefreshTime) / 1000);
+            const label = document.getElementById('lastUpdatedLabel');
+            if (!label) return;
+            if (elapsed < 60) {
+                label.textContent = 'Just now';
+            } else if (elapsed < 3600) {
+                label.textContent = Math.floor(elapsed / 60) + ' min ago';
+            } else {
+                label.textContent = Math.floor(elapsed / 3600) + ' hrs ago';
+            }
+        }, 15000);
     </script>
     <script>
         const dashboardRow    = document.getElementById('dashboardRow');
@@ -397,7 +432,7 @@
             setTimeout(() => map.invalidateSize(), 300);
         }
 
-        // ── Full reset: view + sort + status filter ───────────────────────
+        // ── Full reset: view + sort + status filter + search ─────────────
         function fullReset() {
             // 1. Reset view
             resetView();
@@ -435,7 +470,15 @@
                 dropdown.classList.remove('open');
             }
 
-            // 4. Spin the reset icon for visual feedback
+            // 4. Clear search box
+            const searchBox = document.getElementById('tableSearch');
+            if (searchBox) {
+                searchBox.value = '';
+                document.querySelectorAll('.table-dashboard tbody tr')
+                    .forEach(tr => tr.style.display = '');
+            }
+
+            // 5. Spin the reset icon for visual feedback
             const icon = btnReset.querySelector('i');
             icon.style.transition = 'transform 0.5s ease';
             icon.style.transform  = 'rotate(-360deg)';
@@ -444,10 +487,22 @@
                 icon.style.transform  = '';
             }, 500);
 
-            // 5. Hide filters bar hint
+            // 6. Hide filters bar hint
             activeFiltersBar.classList.add('d-none');
             activeFiltersBar.textContent = '';
         }
+    </script>
+
+    <script>
+        // ── Search box filter ───────────────────────────────────────────────
+        document.getElementById('tableSearch').addEventListener('input', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('.table-dashboard tbody tr').forEach(tr => {
+                const match = !q || Array.from(tr.cells).some(td =>
+                    td.textContent.toLowerCase().includes(q));
+                tr.style.display = match ? '' : 'none';
+            });
+        });
     </script>
 
     <script>
@@ -616,10 +671,28 @@
                 });
             });
         })();
+
+        // ── Column resize handles ────────────────────────────────────────────
+        (function() {
+            const table = document.querySelector('.table-dashboard');
+            if (!table) return;
+            Array.from(table.querySelectorAll('th')).forEach(th => {
+                const resizer = document.createElement('div');
+                resizer.className = 'col-resizer';
+                th.appendChild(resizer);
+                th.style.position = 'relative';
+
+                let startX, startW;
+                resizer.addEventListener('mousedown', e => {
+                    startX = e.pageX;
+                    startW = th.offsetWidth;
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                    e.preventDefault();
+                });
+                function onMove(e) { th.style.width = (startW + e.pageX - startX) + 'px'; }
+                function onUp()   { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+            });
+        })();
     </script>
-
-
-
-
-
 }
