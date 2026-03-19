@@ -1,4 +1,5 @@
 ﻿using asset_monitoring.Data;
+using asset_monitoring.Models;
 using Microsoft.Extensions.Caching.Memory;
 using MySqlConnector;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +8,29 @@ using NLog;
 
 namespace asset_monitoring.Services
 {
+    // ── Request DTOs used by handlers (sent as JSON from JS) ─────────────────
+    public class UpdatePumpRequest
+    {
+        public int PumpId { get; set; }
+        public string VendorName { get; set; } = "";
+        public string? Category { get; set; }
+        public string LocationName { get; set; } = "";
+        public string Status { get; set; } = "OFF";
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class AddPumpRequest
+    {
+        public string VendorName { get; set; } = "";
+        public string? Category { get; set; }
+        public string LocationName { get; set; } = "";
+        public string Status { get; set; } = "OFF";
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
+    }
+
     public class PumpDashboardService
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
@@ -125,18 +149,10 @@ namespace asset_monitoring.Services
             return true;
         }
 
-        // 🔹 Update pump + clear cache
-        public async Task UpdatePumpDetailsAsync(
-            int pumpId,
-            string vendorName,
-            string? category,
-            string locationName,
-            string status,
-            string latitude,
-            string longitude,
-            bool isActive)
+        // 🔹 Update pump details + clear cache
+        public async Task UpdatePumpDetailsAsync(UpdatePumpRequest req)
         {
-            Logger.Info("UpdatePumpDetailsAsync: updating pumpId={0}, status={1}, isActive={2}", pumpId, status, isActive);
+            Logger.Info("UpdatePumpDetailsAsync: pumpId={0}, status={1}, isActive={2}", req.PumpId, req.Status, req.IsActive);
 
             try
             {
@@ -148,31 +164,69 @@ namespace asset_monitoring.Services
                     CommandType = CommandType.StoredProcedure
                 };
 
-                cmd.Parameters.AddWithValue("p_pump_id", pumpId);
-                cmd.Parameters.AddWithValue("p_vendor_name", vendorName);
-                cmd.Parameters.AddWithValue("p_category", category ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("p_location_name", locationName);
-                cmd.Parameters.AddWithValue("p_status", status);
-                cmd.Parameters.AddWithValue("p_latitude", latitude);
-                cmd.Parameters.AddWithValue("p_longitude", longitude);
-                cmd.Parameters.AddWithValue("p_is_active", isActive ? 1 : 1);
+                cmd.Parameters.AddWithValue("p_pump_id", req.PumpId);
+                cmd.Parameters.AddWithValue("p_vendor_name", req.VendorName);
+                cmd.Parameters.AddWithValue("p_category", req.Category ?? (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("p_location_name", req.LocationName);
+                cmd.Parameters.AddWithValue("p_status", req.Status);
+                cmd.Parameters.AddWithValue("p_latitude", req.Latitude?.ToString() ?? "");
+                cmd.Parameters.AddWithValue("p_longitude", req.Longitude?.ToString() ?? "");
+                cmd.Parameters.AddWithValue("p_is_active", req.IsActive ? 1 : 0); // ✅ fixed: was always 1
 
                 var rows = await cmd.ExecuteNonQueryAsync();
 
                 if (rows <= 0)
-                    Logger.Warn("UpdatePumpDetailsAsync: sp_update_pump_details affected 0 rows for pumpId={0}", pumpId);
+                    Logger.Warn("UpdatePumpDetailsAsync: SP affected 0 rows for pumpId={0}", req.PumpId);
                 else
-                    Logger.Info("UpdatePumpDetailsAsync: pumpId={0} updated successfully", pumpId);
+                    Logger.Info("UpdatePumpDetailsAsync: pumpId={0} updated successfully", req.PumpId);
 
-                // ❗ Clear cache after update
                 _cache.Remove(ADMIN_CACHE_KEY);
-                Logger.Debug("UpdatePumpDetailsAsync: admin cache cleared after update of pumpId={0}", pumpId);
+                Logger.Debug("UpdatePumpDetailsAsync: admin cache cleared for pumpId={0}", req.PumpId);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "UpdatePumpDetailsAsync failed for pumpId={0}", pumpId);
+                Logger.Error(ex, "UpdatePumpDetailsAsync failed for pumpId={0}", req.PumpId);
                 throw;
             }
+        }
+
+        // 🔹 Add new pump (master + location rows) + clear cache
+        public async Task<int> AddPumpAsync(AddPumpRequest req)
+        {
+            Logger.Info("AddPumpAsync: vendor={0}, location={1}", req.VendorName, req.LocationName);
+
+            var now = DateTime.UtcNow;
+
+            var pump = new BdaPumpMaster
+            {
+                VendorName = req.VendorName,
+                Category = req.Category,
+                IsActive = true,
+                RowActionCount = 1,
+                RowInsertionDateTime = now,
+                RowUpdationDateTime = now
+            };
+
+            _db.BdaPumpMasters.Add(pump);
+            await _db.SaveChangesAsync(); // generates PumpId
+
+            var location = new BdaPumpLocation
+            {
+                PumpId = pump.PumpId,
+                LocationName = req.LocationName,
+                Latitude = req.Latitude,
+                Longitude = req.Longitude,
+                RowActionCount = 1,
+                RowInsertionDateTime = now,
+                RowUpdationDateTime = now
+            };
+
+            _db.BdaPumpLocations.Add(location);
+            await _db.SaveChangesAsync();
+
+            _cache.Remove(ADMIN_CACHE_KEY);
+            Logger.Info("AddPumpAsync: created pumpId={0}, cache cleared", pump.PumpId);
+            return pump.PumpId;
         }
     }
     public class DashboardPumpDto

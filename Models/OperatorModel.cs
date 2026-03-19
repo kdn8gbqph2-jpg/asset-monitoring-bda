@@ -29,46 +29,18 @@ namespace asset_monitoring.Pages
             return Page();
         }
 
-        [BindProperty]
-        public int PumpId { get; set; }
-        [BindProperty]
-        public string? VendorName { get; set; }
-        [BindProperty]
-        public string? Category { get; set; }
-        [BindProperty]
-        public string? LocationName { get; set; }
-        [BindProperty]
-        public string? Status { get; set; }
-        [BindProperty]
-        public bool IsActive { get; set; }
-        [BindProperty]
-        public string? Latitude { get; set; }
-        [BindProperty]
-        public string? Longitude { get; set; }
-        
-
-        public async Task<IActionResult> OnPostUpdatePumpAsync()
+        public async Task<IActionResult> OnPostUpdatePumpAsync([FromBody] UpdatePumpRequest req)
         {
-            Logger.Info("OnPostUpdatePumpAsync: updating pumpId={0} by operator userId={1}", PumpId, UserId);
-
+            Logger.Info("OnPostUpdatePumpAsync: pumpId={0} by operator userId={1}", req.PumpId, UserId);
             try
             {
-                await _pumpDashboardService.UpdatePumpDetailsAsync(
-                    PumpId,
-                    VendorName ?? "",
-                    Category,
-                    LocationName ?? "",
-                    Status ?? "",
-                    Latitude,
-                    Longitude,
-                    IsActive
-                );
-                Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", PumpId);
+                await _pumpDashboardService.UpdatePumpDetailsAsync(req);
+                Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", req.PumpId);
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "OnPostUpdatePumpAsync failed for pumpId={0}", PumpId);
+                Logger.Error(ex, "OnPostUpdatePumpAsync failed for pumpId={0}", req.PumpId);
                 return new JsonResult(new { success = false, message = "Update failed" });
             }
         }

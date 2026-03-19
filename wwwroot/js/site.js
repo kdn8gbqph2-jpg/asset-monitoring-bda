@@ -1,53 +1,106 @@
 ﻿
+    let editDrawer = null;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function getToken() {
+        return document.querySelector('input[name="__RequestVerificationToken"]').value;
+    }
+
+    function getPumpDrawer() {
+        const el = document.getElementById("editPumpDrawer");
+        return bootstrap.Offcanvas.getInstance(el) ?? new bootstrap.Offcanvas(el);
+    }
+
+    // ── Edit existing pump ────────────────────────────────────────────────────
     function openEditPumpDrawer(id, vendor, location, status, latitude, longitude, isActive) {
-    document.getElementById("editPumpId").value = id;
-    document.getElementById("editVendorName").value = vendor ?? "";
-    document.getElementById("editLocationName").value = location ?? "";
-    document.getElementById("editStatus").value = status ?? "OFF";
-    document.getElementById("editLatitude").value = latitude ?? "";
-    document.getElementById("editLongitude").value = longitude ?? "";
-    /*document.getElementById("editIsActive").checked = isActive;*/
+        document.getElementById("editPumpId").value       = id;
+        document.getElementById("editVendorName").value   = vendor    ?? "";
+        document.getElementById("editLocationName").value = location  ?? "";
+        document.getElementById("editStatus").value       = status    ?? "OFF";
+        document.getElementById("editLatitude").value     = latitude  ?? "";
+        document.getElementById("editLongitude").value    = longitude ?? "";
 
-    const drawerEl = document.getElementById("editPumpDrawer");
-    editDrawer = bootstrap.Offcanvas.getInstance(drawerEl)
-    ?? new bootstrap.Offcanvas(drawerEl);
+        // Restore title + save button for edit mode
+        document.getElementById("pumpDrawerTitle").innerHTML =
+            '<i class="bi bi-pencil-square"></i> Edit Pump';
+        const btn = document.getElementById("pumpDrawerSaveBtn");
+        btn.textContent = "Save Changes";
+        btn.onclick = savePump;
 
-    editDrawer.show();
+        editDrawer = getPumpDrawer();
+        editDrawer.show();
     }
 
     function savePump() {
-        const token = document.querySelector(
-    'input[name="__RequestVerificationToken"]'
-    ).value;
+        const latRaw = parseFloat(document.getElementById("editLatitude").value);
+        const lngRaw = parseFloat(document.getElementById("editLongitude").value);
 
-    fetch('?handler=UpdatePump', {
-        method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-    'RequestVerificationToken': token
+        fetch('?handler=UpdatePump', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': getToken()
             },
-    body: JSON.stringify({
-        PumpId: parseInt(document.getElementById("editPumpId").value),
-    VendorName: document.getElementById("editVendorName").value,
-    LocationName: document.getElementById("editLocationName").value,
-    Latitude: parseFloat(document.getElementById("editLatitude").value),
-    Longitude: parseFloat(document.getElementById("editLongitude").value),
-    Status: document.getElementById("editStatus").value,
-    /*IsActive: document.getElementById("editIsActive").checked*/
+            body: JSON.stringify({
+                PumpId:       parseInt(document.getElementById("editPumpId").value),
+                VendorName:   document.getElementById("editVendorName").value,
+                LocationName: document.getElementById("editLocationName").value,
+                Status:       document.getElementById("editStatus").value,
+                Latitude:     isNaN(latRaw) ? null : latRaw,
+                Longitude:    isNaN(lngRaw) ? null : lngRaw,
+                IsActive:     true
             })
         })
-        .then(res => res.json())
+        .then(r => r.json())
         .then(res => {
-            if (res.success) {
-        editDrawer.hide();
-    location.reload();
-            } else {
-        alert("Update failed");
-            }
+            if (res.success) { editDrawer.hide(); location.reload(); }
+            else alert("Update failed: " + (res.message ?? "Unknown error"));
         })
-        .catch(err => {
-        console.error(err);
-    alert("Error while saving pump");
-        });
+        .catch(err => { console.error(err); alert("Error saving pump"); });
+    }
+
+    // ── Add new pump ──────────────────────────────────────────────────────────
+    function openAddPumpDrawer() {
+        document.getElementById("editPumpId").value       = "0";
+        document.getElementById("editVendorName").value   = "";
+        document.getElementById("editLocationName").value = "";
+        document.getElementById("editStatus").value       = "OFF";
+        document.getElementById("editLatitude").value     = "";
+        document.getElementById("editLongitude").value    = "";
+
+        document.getElementById("pumpDrawerTitle").innerHTML =
+            '<i class="bi bi-plus-circle"></i> Add Pump';
+        const btn = document.getElementById("pumpDrawerSaveBtn");
+        btn.textContent = "Add Pump";
+        btn.onclick = saveNewPump;
+
+        editDrawer = getPumpDrawer();
+        editDrawer.show();
+    }
+
+    function saveNewPump() {
+        const latRaw = parseFloat(document.getElementById("editLatitude").value);
+        const lngRaw = parseFloat(document.getElementById("editLongitude").value);
+
+        fetch('?handler=AddPump', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': getToken()
+            },
+            body: JSON.stringify({
+                VendorName:   document.getElementById("editVendorName").value,
+                LocationName: document.getElementById("editLocationName").value,
+                Status:       document.getElementById("editStatus").value,
+                Latitude:     isNaN(latRaw) ? null : latRaw,
+                Longitude:    isNaN(lngRaw) ? null : lngRaw
+            })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) { editDrawer.hide(); location.reload(); }
+            else alert("Failed to add pump: " + (res.message ?? "Unknown error"));
+        })
+        .catch(err => { console.error(err); alert("Error adding pump"); });
     }
 

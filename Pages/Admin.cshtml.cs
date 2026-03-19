@@ -61,71 +61,39 @@ namespace asset_monitoring.Pages
             return Page();
         }
 
-        // Add handlers for pump edit/delete as needed
-        [BindProperty]
-        public int PumpId { get; set; }
-        [BindProperty]
-        public string? VendorName { get; set; }
-        [BindProperty]
-        public string? Category { get; set; }
-        [BindProperty]
-        public string? LocationName { get; set; }
-        [BindProperty]
-        public string? Status { get; set; }
-        [BindProperty]
-        public bool IsActive { get; set; }
+        // ── Pump handlers ────────────────────────────────────────────────────
 
-        [BindProperty]
-        public string? Latitude { get; set; }
-        [BindProperty]
-        public string? Longitude { get; set; }
-
-        [BindProperty]
-        public EditUserInputModel EditUser { get; set; } = new();
-
-        public async Task<IActionResult> OnPostUpdateUserAsync()
+        public async Task<IActionResult> OnPostUpdatePumpAsync([FromBody] UpdatePumpRequest req)
         {
-            if (EditUser == null || EditUser.UserId <= 0)
-            {
-                Logger.Warn("OnPostUpdateUserAsync: invalid input received, userId={0}", EditUser?.UserId);
-                return new JsonResult(new { success = false, message = "Invalid input" });
-            }
-
-            Logger.Info("OnPostUpdateUserAsync: updating userId={0}, name={1}, userType={2} by admin={3}",
-                EditUser.UserId, EditUser.Name, EditUser.UserType, Username);
-
+            Logger.Info("OnPostUpdatePumpAsync: pumpId={0} by admin={1}", req.PumpId, Username);
             try
             {
-                var rows = await _context.Database.ExecuteSqlRawAsync(
-                    "CALL sp_update_user_master({0},{1},{2},{3},{4},{5})",
-                    EditUser.UserId,
-                    EditUser.Name,
-                    EditUser.UserType,   // pass string enum
-                    EditUser.MobileNumber,
-                    string.IsNullOrWhiteSpace(EditUser.Password)
-                        ? String.Empty
-                        : EditUser.Password,   // hash before this in prod
-                    EditUser.IsActive ? 1 : 0
-                );
-
-                if (rows <= 0)
-                {
-                    Logger.Warn("OnPostUpdateUserAsync: sp_update_user_master affected 0 rows for userId={0}", EditUser.UserId);
-                    return new JsonResult(new { success = false });
-                }
-
-                _userCache.Reload();
-                Logger.Info("OnPostUpdateUserAsync: userId={0} updated successfully, user cache reloaded", EditUser.UserId);
+                await _pumpDashboardService.UpdatePumpDetailsAsync(req);
+                Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", req.PumpId);
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "OnPostUpdateUserAsync failed for userId={0}", EditUser.UserId);
-                return new JsonResult(new { success = false, message = "An error occurred" });
+                Logger.Error(ex, "OnPostUpdatePumpAsync failed for pumpId={0}", req.PumpId);
+                return new JsonResult(new { success = false, message = "Update failed" });
             }
         }
 
-
+        public async Task<IActionResult> OnPostAddPumpAsync([FromBody] AddPumpRequest req)
+        {
+            Logger.Info("OnPostAddPumpAsync: vendor={0}, location={1} by admin={2}", req.VendorName, req.LocationName, Username);
+            try
+            {
+                var newId = await _pumpDashboardService.AddPumpAsync(req);
+                Logger.Info("OnPostAddPumpAsync: created pumpId={0}", newId);
+                return new JsonResult(new { success = true, pumpId = newId });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostAddPumpAsync failed for vendor={0}", req.VendorName);
+                return new JsonResult(new { success = false, message = "Failed to add pump" });
+            }
+        }
 
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
@@ -134,29 +102,113 @@ namespace asset_monitoring.Pages
             return RedirectToPage();
         }
 
-        public async Task<IActionResult> OnPostUpdatePumpAsync()
+        // ── User handlers ────────────────────────────────────────────────────
+
+        public async Task<IActionResult> OnPostUpdateUserAsync([FromBody] EditUserInputModel req)
         {
-            Logger.Info("OnPostUpdatePumpAsync: updating pumpId={0} by admin={1}", PumpId, Username);
+            if (req == null || req.UserId <= 0)
+            {
+                Logger.Warn("OnPostUpdateUserAsync: invalid input, userId={0}", req?.UserId);
+                return new JsonResult(new { success = false, message = "Invalid input" });
+            }
+
+            Logger.Info("OnPostUpdateUserAsync: userId={0}, userType={1} by admin={2}", req.UserId, req.UserType, Username);
 
             try
             {
-                await _pumpDashboardService.UpdatePumpDetailsAsync(
-                    PumpId,
-                    VendorName ?? "",
-                    Category,
-                    LocationName ?? "",
-                    Status ?? "",
-                    Latitude ?? "",
-                    Longitude ?? "",
-                    IsActive
-                );
-                Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", PumpId);
+                var user = await _context.BdaUserMasters.FindAsync(req.UserId);
+                if (user == null)
+                {
+                    Logger.Warn("OnPostUpdateUserAsync: userId={0} not found", req.UserId);
+                    return new JsonResult(new { success = false, message = "User not found" });
+                }
+
+                user.Name = req.Name;
+                if (Enum.TryParse<BdaUserType>(req.UserType, true, out var parsedType))
+                    user.UserType = parsedType;
+                user.MobileNumber = req.MobileNumber;
+                if (!string.IsNullOrWhiteSpace(req.Password))
+                    user.Password = req.Password; // Sprint 4: hash this
+                user.IsActive = req.IsActive;
+                user.RowUpdationDateTime = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                _userCache.Reload();
+
+                Logger.Info("OnPostUpdateUserAsync: userId={0} updated, cache reloaded", req.UserId);
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "OnPostUpdatePumpAsync failed for pumpId={0}", PumpId);
-                return new JsonResult(new { success = false, message = "Update failed" });
+                Logger.Error(ex, "OnPostUpdateUserAsync failed for userId={0}", req.UserId);
+                return new JsonResult(new { success = false, message = "An error occurred" });
+            }
+        }
+
+        public async Task<IActionResult> OnPostAddUserAsync([FromBody] EditUserInputModel req)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.MobileNumber))
+            {
+                Logger.Warn("OnPostAddUserAsync: missing required fields");
+                return new JsonResult(new { success = false, message = "Name and Mobile are required" });
+            }
+
+            Logger.Info("OnPostAddUserAsync: name={0}, userType={1} by admin={2}", req.Name, req.UserType, Username);
+
+            try
+            {
+                var now = DateTime.UtcNow;
+                Enum.TryParse<BdaUserType>(req.UserType, true, out var parsedType);
+
+                var user = new BdaUserMaster
+                {
+                    Name = req.Name,
+                    UserType = parsedType,
+                    MobileNumber = req.MobileNumber,
+                    Password = req.Password, // Sprint 4: hash this
+                    IsActive = true,
+                    RowInsertionDateTime = now,
+                    RowUpdationDateTime = now
+                };
+
+                _context.BdaUserMasters.Add(user);
+                await _context.SaveChangesAsync();
+                _userCache.Reload();
+
+                Logger.Info("OnPostAddUserAsync: created userId={0}", user.UserId);
+                return new JsonResult(new { success = true, userId = user.UserId });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostAddUserAsync failed for name={0}", req.Name);
+                return new JsonResult(new { success = false, message = "Failed to add user" });
+            }
+        }
+
+        public async Task<IActionResult> OnPostDeleteUserAsync(int id)
+        {
+            Logger.Info("OnPostDeleteUserAsync: deactivating userId={0} by admin={1}", id, Username);
+            try
+            {
+                var user = await _context.BdaUserMasters.FindAsync(id);
+                if (user == null)
+                {
+                    Logger.Warn("OnPostDeleteUserAsync: userId={0} not found", id);
+                    return new JsonResult(new { success = false, message = "User not found" });
+                }
+
+                user.IsActive = false;
+                user.RowUpdationDateTime = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                _userCache.Reload();
+
+                Logger.Info("OnPostDeleteUserAsync: userId={0} deactivated, cache reloaded", id);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostDeleteUserAsync failed for userId={0}", id);
+                return new JsonResult(new { success = false, message = "An error occurred" });
             }
         }
 
