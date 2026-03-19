@@ -95,7 +95,8 @@
                             <th class="sortable" data-col="1" data-type="str">Vendor <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="2" data-type="str">Location <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="3" data-type="str">Mobile <span class="sort-icon">⇅</span></th>
-                            <th class="th-filter" id="thStatus" style="position:relative;">
+                            <th class="sortable" data-col="4" data-type="num">Running <span class="sort-icon">⇅</span></th>
+                            <th class="th-filter" id="thStatus" data-col="5" style="position:relative;">
                                 Status <span class="filter-icon">▾</span>
                                 <div class="status-dropdown" id="statusDropdown">
                                     <div class="status-dropdown-item" data-val="">All</div>
@@ -119,6 +120,25 @@
                                 <td>@p.VendorName</td>
                                 <td>@p.Location</td>
                                 <td>@p.MobileNumber</td>
+                                <td>
+                                    @if (p.RunningMinutes > 0)
+                                    {
+                                        var h = p.RunningMinutes / 60;
+                                        var m = p.RunningMinutes % 60;
+                                        if (h > 0)
+                                        {
+                                            <span class="text-success fw-semibold">@h h @m m</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success fw-semibold">@m m</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
                                 <td>
                                     @if (p.Status == "ON")
                                     {
@@ -529,7 +549,7 @@
 
                     // Filter rows
                     document.querySelectorAll('.table-dashboard tbody tr').forEach(tr => {
-                        const status = tr.cells[4].textContent.trim();
+                        const status = tr.cells[5].textContent.trim();
                         tr.style.display = (!activeFilter || status === activeFilter) ? '' : 'none';
                     });
 
