@@ -112,24 +112,27 @@ html {
     background-color: #f0f6ff;
 }
 
-/* ── Sticky Status column (always visible on the right while scrolling) ── */
-.table-dashboard th:last-child {
-    position: sticky;
+/* ── Sticky Status column (always visible on the right while scrolling) ──
+   Uses an explicit class rather than :last-child so sticky stacking is
+   unambiguous regardless of table/overflow-container nesting.           ── */
+.table-dashboard th.col-sticky-right {
+    position: sticky !important;
     right: 0;
-    z-index: 2;   /* above other sticky headers */
-    box-shadow: -2px 0 5px rgba(0,0,0,0.12);
+    z-index: 3;                                        /* above body + header */
+    background-color: var(--table-header-bg) !important;
+    box-shadow: -3px 0 6px rgba(0,0,0,0.18);
 }
 
-.table-dashboard td:last-child {
-    position: sticky;
+.table-dashboard td.col-sticky-right {
+    position: sticky !important;
     right: 0;
-    background: #fff;
-    z-index: 1;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.08);
+    z-index: 2;
+    background-color: #ffffff !important;              /* must be opaque */
+    box-shadow: -3px 0 6px rgba(0,0,0,0.10);
 }
 
-.table-dashboard tbody tr:hover td:last-child {
-    background: #f0f6ff;  /* match row hover */
+.table-dashboard tbody tr:hover td.col-sticky-right {
+    background-color: #f0f6ff !important;              /* keep hover tint */
 }
 
 /* Sortable column headers */
@@ -299,11 +302,14 @@ html {
 }
 
 /* Table-responsive scrolls inside the card; grows to fill remaining space
-   after the "Report Issue" button row */
+   after the "Report Issue" button row.
+   overflow-x + overflow-y set separately so sticky-right has a clear
+   single-axis horizontal scroll container. */
 #tableCol .table-responsive {
     flex: 1 1 0;
     min-height: 0;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 /* Expand map mode */

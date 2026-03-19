@@ -99,7 +99,7 @@
                             <th class="sortable" data-col="5" data-type="str">JE Name <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="6" data-type="str">JE Mobile <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="7" data-type="num">Running <span class="sort-icon">⇅</span></th>
-                            <th class="th-filter" id="thStatus" data-col="8" style="position:relative;">
+                            <th class="th-filter col-sticky-right" id="thStatus" data-col="8" style="position:relative;">
                                 Status <span class="filter-icon">▾</span>
                                 <div class="status-dropdown" id="statusDropdown">
                                     <div class="status-dropdown-item" data-val="">All</div>
@@ -145,7 +145,7 @@
                                         <span class="text-muted">—</span>
                                     }
                                 </td>
-                                <td>
+                                <td class="col-sticky-right">
                                     @if (p.Status == "ON")
                                     {
                                         <span class="badge-status-on">ON</span>
