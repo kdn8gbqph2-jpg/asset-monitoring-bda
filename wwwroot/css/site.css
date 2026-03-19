@@ -112,6 +112,26 @@ html {
     background-color: #f0f6ff;
 }
 
+/* ── Sticky Status column (always visible on the right while scrolling) ── */
+.table-dashboard th:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;   /* above other sticky headers */
+    box-shadow: -2px 0 5px rgba(0,0,0,0.12);
+}
+
+.table-dashboard td:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    z-index: 1;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.08);
+}
+
+.table-dashboard tbody tr:hover td:last-child {
+    background: #f0f6ff;  /* match row hover */
+}
+
 /* Sortable column headers */
 .table-dashboard th.sortable {
     cursor: pointer;
