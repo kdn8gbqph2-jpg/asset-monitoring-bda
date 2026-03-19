@@ -372,7 +372,8 @@ html {
    ========================================================= */
 
 .expand-map #mapCol {
-    flex: 0 0 100%;
+    flex: 0 0 100% !important;
+    width: 100% !important;
     max-width: 100%;
 }
 
@@ -381,7 +382,8 @@ html {
 }
 
 .expand-list #tableCol {
-    flex: 0 0 100%;
+    flex: 0 0 100% !important;
+    width: 100% !important;
     max-width: 100%;
 }
 
@@ -392,7 +394,8 @@ html {
 /* Expanded height uses viewport */
 #dashboardRow.expand-map,
 #dashboardRow.expand-list {
-    height: calc(100vh - 220px);
+    height: calc(100vh - 200px);
+    min-height: 500px;
 }
 
 #dashboardRow.expand-list #tableCol .table-responsive {

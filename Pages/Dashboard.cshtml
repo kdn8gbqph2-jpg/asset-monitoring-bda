@@ -95,10 +95,6 @@
         </div>
         <div class="col-12 col-md-6" id="tableCol">
             <div class="card h-100 d-flex flex-column">
-                <div class="px-3 pt-3 pb-2">
-                    <input type="search" id="tableSearch" class="form-control form-control-sm"
-                           placeholder="🔍 Search pumps…" />
-                </div>
                 <div class="table-responsive">
                 <table class="table table-dashboard mb-0 align-middle">
                     <thead>
@@ -470,15 +466,7 @@
                 dropdown.classList.remove('open');
             }
 
-            // 4. Clear search box
-            const searchBox = document.getElementById('tableSearch');
-            if (searchBox) {
-                searchBox.value = '';
-                document.querySelectorAll('.table-dashboard tbody tr')
-                    .forEach(tr => tr.style.display = '');
-            }
-
-            // 5. Spin the reset icon for visual feedback
+            // 4. Spin the reset icon for visual feedback
             const icon = btnReset.querySelector('i');
             icon.style.transition = 'transform 0.5s ease';
             icon.style.transform  = 'rotate(-360deg)';
@@ -487,22 +475,10 @@
                 icon.style.transform  = '';
             }, 500);
 
-            // 6. Hide filters bar hint
+            // 5. Hide filters bar hint
             activeFiltersBar.classList.add('d-none');
             activeFiltersBar.textContent = '';
         }
-    </script>
-
-    <script>
-        // ── Search box filter ───────────────────────────────────────────────
-        document.getElementById('tableSearch').addEventListener('input', function() {
-            const q = this.value.toLowerCase();
-            document.querySelectorAll('.table-dashboard tbody tr').forEach(tr => {
-                const match = !q || Array.from(tr.cells).some(td =>
-                    td.textContent.toLowerCase().includes(q));
-                tr.style.display = match ? '' : 'none';
-            });
-        });
     </script>
 
     <script>
