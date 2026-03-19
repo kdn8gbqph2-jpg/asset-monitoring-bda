@@ -108,3 +108,25 @@
         .catch(err => { console.error(err); alert("Error adding pump"); });
     }
 
+
+    // -- Delegated click handler for .edit-pump-btn (data-* attrs avoid null/
+    //    apostrophe injection that inline onclick suffered from)
+    document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.edit-pump-btn');
+            if (!btn) return;
+
+            const lat = btn.dataset.lat;
+            const lng = btn.dataset.lng;
+
+            openEditPumpDrawer(
+                btn.dataset.pumpId,
+                btn.dataset.vendor   || '',
+                btn.dataset.location || '',
+                btn.dataset.status   || 'OFF',
+                lat && lat !== '' ? parseFloat(lat) : null,
+                lng && lng !== '' ? parseFloat(lng) : null,
+                true
+            );
+        });
+    });
