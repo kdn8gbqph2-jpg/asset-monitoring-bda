@@ -1,4 +1,4 @@
-﻿namespace asset_monitoring.Services
+namespace asset_monitoring.Services
 {
     using asset_monitoring.Data;
     using asset_monitoring.Models;
@@ -20,6 +20,8 @@
             Load();
         }
 
+        // Replaces sp_get_active_users() with a direct EF Core query.
+        // UserName is set to MobileNumber because login uses mobile as the key.
         private void Load()
         {
             try
@@ -27,16 +29,27 @@
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                var users = db.ActiveUsers
-                    .FromSqlRaw("CALL sp_get_active_users()")
+                var users = db.BdaUserMasters
+                    .Where(u => u.IsActive)
                     .AsNoTracking()
+                    .Select(u => new ActiveUsers
+                    {
+                        UserId       = u.UserId,
+                        Name         = u.Name         ?? "",
+                        UserName     = u.MobileNumber ?? "",   // mobile is the login key
+                        UserType     = u.UserType.HasValue
+                                           ? u.UserType.Value.ToString()
+                                           : "",
+                        Password     = u.Password     ?? "",
+                        MobileNumber = u.MobileNumber ?? ""
+                    })
                     .ToList();
 
                 Users = users
                     .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
                     .ToDictionary(u => u.UserName, u => u);
 
-                Logger.Info("UserCacheService.Load: loaded {0} active users into cache", Users.Count);
+                Logger.Info("UserCacheService.Load: {0} active users loaded into cache", Users.Count);
             }
             catch (Exception ex)
             {
@@ -45,12 +58,10 @@
             }
         }
 
-        // Optional: manual reload
         public void Reload()
         {
             Logger.Info("UserCacheService.Reload: reloading user cache");
             Load();
         }
     }
-
 }

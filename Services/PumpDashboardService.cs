@@ -1,9 +1,7 @@
-﻿using asset_monitoring.Data;
+using asset_monitoring.Data;
 using asset_monitoring.Models;
 using Microsoft.Extensions.Caching.Memory;
-using MySqlConnector;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
 using NLog;
 
 namespace asset_monitoring.Services
@@ -46,92 +44,115 @@ namespace asset_monitoring.Services
             _cache = cache;
         }
 
+        // ── Public query entry-point ──────────────────────────────────────────
         public async Task<List<DashboardPumpDto>> GetPumpsAsync(
             int? userId = null,
             string? user_type = "ADMIN")
         {
-            // 🔹 ADMIN: cached data
             if (user_type == "ADMIN")
             {
-                if (_cache.TryGetValue(ADMIN_CACHE_KEY, out List<DashboardPumpDto> cachedPumps))
+                if (_cache.TryGetValue(ADMIN_CACHE_KEY, out List<DashboardPumpDto> cached))
                 {
-                    Logger.Debug("GetPumpsAsync: returning {0} pumps from cache for ADMIN", cachedPumps.Count);
-                    return cachedPumps;
+                    Logger.Debug("GetPumpsAsync: cache hit — {0} pumps for ADMIN", cached.Count);
+                    return cached;
                 }
 
-                Logger.Debug("GetPumpsAsync: cache miss for ADMIN, fetching from DB");
+                Logger.Debug("GetPumpsAsync: cache miss for ADMIN, querying DB");
                 var pumps = await FetchFromDatabaseAsync(null, "ADMIN");
 
-                _cache.Set(
-                    ADMIN_CACHE_KEY,
-                    pumps,
-                    new MemoryCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
-                        SlidingExpiration = TimeSpan.FromMinutes(2)
-                    });
+                _cache.Set(ADMIN_CACHE_KEY, pumps, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                    SlidingExpiration               = TimeSpan.FromMinutes(2)
+                });
 
-                Logger.Info("GetPumpsAsync: loaded {0} pumps from DB and cached for ADMIN", pumps.Count);
+                Logger.Info("GetPumpsAsync: cached {0} pumps for ADMIN", pumps.Count);
                 return pumps;
             }
 
-            // 🔹 NON-ADMIN: always fetch fresh (user-specific)
-            Logger.Debug("GetPumpsAsync: fetching fresh data for userId={0}, userType={1}", userId, user_type);
+            Logger.Debug("GetPumpsAsync: fresh query for userId={0}, userType={1}", userId, user_type);
             return await FetchFromDatabaseAsync(userId, user_type);
         }
 
+        // ── Core EF Core LINQ query (replaces sp_get_pump_dashboard_data) ─────
         private async Task<List<DashboardPumpDto>> FetchFromDatabaseAsync(
-            int? userId,
-            string? user_type)
+            int? userId, string? user_type)
         {
-            var pumps = new List<DashboardPumpDto>();
-
             try
             {
-                await using var conn = new MySqlConnection(_db.Database.GetConnectionString());
-                await conn.OpenAsync();
-
-                await using var cmd = new MySqlCommand("sp_get_pump_dashboard_data", conn)
+                // For non-admin: look up the operator's mobile (used as UpdatedBy key)
+                string? operatorMobile = null;
+                if (user_type != "ADMIN" && userId.HasValue)
                 {
-                    CommandType = CommandType.StoredProcedure
-                };
+                    operatorMobile = await _db.BdaUserMasters
+                        .Where(u => u.UserId == userId.Value && u.IsActive)
+                        .Select(u => u.MobileNumber)
+                        .FirstOrDefaultAsync();
 
-                cmd.Parameters.AddWithValue("p_userid", userId);
-                cmd.Parameters.AddWithValue("p_user_type", user_type);
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-
-                while (await reader.ReadAsync())
-                {
-                    pumps.Add(new DashboardPumpDto
-                    {
-                        PumpId = reader["pump_id"].ToString()!,
-                        VendorName = reader["vendor_name"]?.ToString(),
-                        Location = reader["location_name"]?.ToString(),
-                        Latitude = reader["latitude"] == DBNull.Value ? null : Convert.ToDecimal(reader["latitude"]),
-                        Longitude = reader["longitude"] == DBNull.Value ? null : Convert.ToDecimal(reader["longitude"]),
-                        Status = reader["pump_status"]?.ToString(),
-                        RunningMinutes = Convert.ToInt32(reader["running_time_minutes"]),
-                        LastUpdated = Convert.ToDateTime(reader["last_updated_time"]),
-                        MobileNumber = reader["operator_mobile"]?.ToString()
-                    });
+                    Logger.Debug("FetchFromDatabaseAsync: operator mobile={0} for userId={1}",
+                        operatorMobile, userId);
                 }
 
-                Logger.Debug("FetchFromDatabaseAsync: retrieved {0} pumps for userId={1}, userType={2}", pumps.Count, userId, user_type);
+                // Join pump master → location (left) → status entry (left)
+                var rawData = await (
+                    from pump in _db.BdaPumpMasters
+                    where pump.IsActive
+                    join loc   in _db.BdaPumpLocations   on pump.PumpId equals loc.PumpId   into locGroup
+                    from loc   in locGroup.DefaultIfEmpty()
+                    join entry in _db.PumpStatusEntries  on pump.PumpId equals entry.PumpId into entryGroup
+                    from entry in entryGroup.DefaultIfEmpty()
+                    where operatorMobile == null || (entry != null && entry.UpdatedBy == operatorMobile)
+                    select new
+                    {
+                        pump.PumpId,
+                        pump.VendorName,
+                        LocationName     = loc   != null ? loc.LocationName        : null,
+                        Latitude         = loc   != null ? loc.Latitude            : (decimal?)null,
+                        Longitude        = loc   != null ? loc.Longitude           : (decimal?)null,
+                        EntryStatus      = entry != null ? (PumpStatus?)entry.Status : null,
+                        CurrentStartTime = entry != null ? entry.CurrentStartTime  : (DateTime?)null,
+                        LastUpdated      = entry != null ? entry.RowUpdationDateTime : pump.RowUpdationDateTime,
+                        OperatorMobile   = entry != null ? entry.UpdatedBy         : null
+                    }
+                ).AsNoTracking().ToListAsync();
+
+                // Compute running minutes in memory (can't translate DateDiff to EF easily)
+                var pumps = rawData.Select(r => new DashboardPumpDto
+                {
+                    PumpId         = r.PumpId.ToString(),
+                    VendorName     = r.VendorName,
+                    Location       = r.LocationName,
+                    Latitude       = r.Latitude,
+                    Longitude      = r.Longitude,
+                    Status         = r.EntryStatus switch
+                    {
+                        PumpStatus.On          => "ON",
+                        PumpStatus.Maintenance => "MAINTENANCE",
+                        _                      => "OFF"
+                    },
+                    RunningMinutes = r.EntryStatus == PumpStatus.On && r.CurrentStartTime.HasValue
+                        ? (int)(DateTime.UtcNow - r.CurrentStartTime.Value).TotalMinutes
+                        : 0,
+                    LastUpdated    = r.LastUpdated,
+                    MobileNumber   = r.OperatorMobile
+                }).ToList();
+
+                Logger.Debug("FetchFromDatabaseAsync: {0} pumps for userId={1}, userType={2}",
+                    pumps.Count, userId, user_type);
+
+                return pumps;
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "FetchFromDatabaseAsync failed for userId={0}, userType={1}", userId, user_type);
                 throw;
             }
-
-            return pumps;
         }
 
-        // 🔹 Soft-delete pump + clear cache
+        // ── Soft-delete pump + clear cache ────────────────────────────────────
         public async Task<bool> DeletePumpAsync(int pumpId)
         {
-            Logger.Info("DeletePumpAsync: soft-deleting pumpId={0}", pumpId);
+            Logger.Info("DeletePumpAsync: pumpId={0}", pumpId);
 
             var pump = await _db.BdaPumpMasters.FindAsync(pumpId);
             if (pump == null)
@@ -140,48 +161,88 @@ namespace asset_monitoring.Services
                 return false;
             }
 
-            pump.IsActive = false;
-            _db.BdaPumpMasters.Update(pump);
+            pump.IsActive            = false;
+            pump.RowUpdationDateTime = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 
             _cache.Remove(ADMIN_CACHE_KEY);
-            Logger.Info("DeletePumpAsync: pumpId={0} marked inactive, cache cleared", pumpId);
+            Logger.Info("DeletePumpAsync: pumpId={0} deactivated, cache cleared", pumpId);
             return true;
         }
 
-        // 🔹 Update pump details + clear cache
+        // ── Update pump details (replaces sp_update_pump_details) ─────────────
         public async Task UpdatePumpDetailsAsync(UpdatePumpRequest req)
         {
-            Logger.Info("UpdatePumpDetailsAsync: pumpId={0}, status={1}, isActive={2}", req.PumpId, req.Status, req.IsActive);
-
+            Logger.Info("UpdatePumpDetailsAsync: pumpId={0}, status={1}, isActive={2}",
+                req.PumpId, req.Status, req.IsActive);
             try
             {
-                await using var conn = new MySqlConnection(_db.Database.GetConnectionString());
-                await conn.OpenAsync();
+                var now = DateTime.UtcNow;
 
-                await using var cmd = new MySqlCommand("sp_update_pump_details", conn)
+                // 1. BdaPumpMaster
+                var pump = await _db.BdaPumpMasters.FindAsync(req.PumpId);
+                if (pump == null)
                 {
-                    CommandType = CommandType.StoredProcedure
+                    Logger.Warn("UpdatePumpDetailsAsync: pumpId={0} not found", req.PumpId);
+                    return;
+                }
+                pump.VendorName          = req.VendorName;
+                pump.Category            = req.Category;
+                pump.IsActive            = req.IsActive;
+                pump.RowUpdationDateTime = now;
+
+                // 2. BdaPumpLocation (upsert)
+                var location = await _db.BdaPumpLocations.FindAsync(req.PumpId);
+                if (location == null)
+                {
+                    _db.BdaPumpLocations.Add(new BdaPumpLocation
+                    {
+                        PumpId               = req.PumpId,
+                        LocationName         = req.LocationName,
+                        Latitude             = req.Latitude,
+                        Longitude            = req.Longitude,
+                        RowActionCount       = 1,
+                        RowInsertionDateTime = now,
+                        RowUpdationDateTime  = now
+                    });
+                }
+                else
+                {
+                    location.LocationName        = req.LocationName;
+                    location.Latitude            = req.Latitude;
+                    location.Longitude           = req.Longitude;
+                    location.RowUpdationDateTime = now;
+                }
+
+                // 3. PumpStatusEntry (upsert)
+                var newStatus = req.Status.ToUpperInvariant() switch
+                {
+                    "ON"          => PumpStatus.On,
+                    "MAINTENANCE" => PumpStatus.Maintenance,
+                    _             => PumpStatus.Off
                 };
 
-                cmd.Parameters.AddWithValue("p_pump_id", req.PumpId);
-                cmd.Parameters.AddWithValue("p_vendor_name", req.VendorName);
-                cmd.Parameters.AddWithValue("p_category", req.Category ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("p_location_name", req.LocationName);
-                cmd.Parameters.AddWithValue("p_status", req.Status);
-                cmd.Parameters.AddWithValue("p_latitude", req.Latitude?.ToString() ?? "");
-                cmd.Parameters.AddWithValue("p_longitude", req.Longitude?.ToString() ?? "");
-                cmd.Parameters.AddWithValue("p_is_active", req.IsActive ? 1 : 0); // ✅ fixed: was always 1
-
-                var rows = await cmd.ExecuteNonQueryAsync();
-
-                if (rows <= 0)
-                    Logger.Warn("UpdatePumpDetailsAsync: SP affected 0 rows for pumpId={0}", req.PumpId);
+                var entry = await _db.PumpStatusEntries.FindAsync(req.PumpId);
+                if (entry == null)
+                {
+                    _db.PumpStatusEntries.Add(new PumpStatusEntry
+                    {
+                        PumpId               = req.PumpId,
+                        Status               = newStatus,
+                        RowActionCount       = 1,
+                        RowInsertionDateTime = now,
+                        RowUpdationDateTime  = now
+                    });
+                }
                 else
-                    Logger.Info("UpdatePumpDetailsAsync: pumpId={0} updated successfully", req.PumpId);
+                {
+                    entry.Status               = newStatus;
+                    entry.RowUpdationDateTime  = now;
+                }
 
+                await _db.SaveChangesAsync();
                 _cache.Remove(ADMIN_CACHE_KEY);
-                Logger.Debug("UpdatePumpDetailsAsync: admin cache cleared for pumpId={0}", req.PumpId);
+                Logger.Info("UpdatePumpDetailsAsync: pumpId={0} updated via EF Core", req.PumpId);
             }
             catch (Exception ex)
             {
@@ -190,38 +251,46 @@ namespace asset_monitoring.Services
             }
         }
 
-        // 🔹 Add new pump (master + location rows) + clear cache
+        // ── Add new pump (master + location rows) ─────────────────────────────
         public async Task<int> AddPumpAsync(AddPumpRequest req)
         {
             Logger.Info("AddPumpAsync: vendor={0}, location={1}", req.VendorName, req.LocationName);
-
             var now = DateTime.UtcNow;
 
             var pump = new BdaPumpMaster
             {
-                VendorName = req.VendorName,
-                Category = req.Category,
-                IsActive = true,
-                RowActionCount = 1,
+                VendorName           = req.VendorName,
+                Category             = req.Category,
+                IsActive             = true,
+                RowActionCount       = 1,
                 RowInsertionDateTime = now,
-                RowUpdationDateTime = now
+                RowUpdationDateTime  = now
             };
 
             _db.BdaPumpMasters.Add(pump);
-            await _db.SaveChangesAsync(); // generates PumpId
+            await _db.SaveChangesAsync(); // generates PumpId via auto-increment
 
-            var location = new BdaPumpLocation
+            _db.BdaPumpLocations.Add(new BdaPumpLocation
             {
-                PumpId = pump.PumpId,
-                LocationName = req.LocationName,
-                Latitude = req.Latitude,
-                Longitude = req.Longitude,
-                RowActionCount = 1,
+                PumpId               = pump.PumpId,
+                LocationName         = req.LocationName,
+                Latitude             = req.Latitude,
+                Longitude            = req.Longitude,
+                RowActionCount       = 1,
                 RowInsertionDateTime = now,
-                RowUpdationDateTime = now
-            };
+                RowUpdationDateTime  = now
+            });
 
-            _db.BdaPumpLocations.Add(location);
+            // Seed an initial OFF status entry so the pump appears on the dashboard
+            _db.PumpStatusEntries.Add(new PumpStatusEntry
+            {
+                PumpId               = pump.PumpId,
+                Status               = PumpStatus.Off,
+                RowActionCount       = 1,
+                RowInsertionDateTime = now,
+                RowUpdationDateTime  = now
+            });
+
             await _db.SaveChangesAsync();
 
             _cache.Remove(ADMIN_CACHE_KEY);
@@ -229,6 +298,7 @@ namespace asset_monitoring.Services
             return pump.PumpId;
         }
     }
+
     public class DashboardPumpDto
     {
         public string PumpId { get; set; } = "";

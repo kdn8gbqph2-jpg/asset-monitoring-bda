@@ -29,12 +29,12 @@ namespace asset_monitoring.Data.Configurations
 
             entity.Property(e => e.OldStatus)
                   .HasColumnName("old_status")
-                  .HasConversion<string>()
+                  .HasConversion(PumpStatusConverter.NullableInstance)
                   .HasColumnType("enum('ON','OFF','MAINTENANCE')");
 
             entity.Property(e => e.NewStatus)
                   .HasColumnName("new_status")
-                  .HasConversion<string>()
+                  .HasConversion(PumpStatusConverter.Instance)
                   .HasColumnType("enum('ON','OFF','MAINTENANCE')")
                   .IsRequired();
 

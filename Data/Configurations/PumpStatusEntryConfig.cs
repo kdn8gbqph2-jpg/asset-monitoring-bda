@@ -18,7 +18,7 @@ namespace asset_monitoring.Data.Configurations
 
             entity.Property(e => e.Status)
                   .HasColumnName("status")
-                  .HasConversion<string>()
+                  .HasConversion(PumpStatusConverter.Instance)
                   .HasColumnType("enum('ON','OFF','MAINTENANCE')")
                   .IsRequired();
 
