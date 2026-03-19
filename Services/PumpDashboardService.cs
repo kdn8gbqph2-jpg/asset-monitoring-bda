@@ -17,6 +17,8 @@ namespace asset_monitoring.Services
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
         public bool IsActive { get; set; } = true;
+        public string? Remarks { get; set; }          // operator comment
+        public string? UpdatedBy { get; set; }        // operator mobile (set by handler)
     }
 
     public class AddPumpRequest
@@ -27,6 +29,24 @@ namespace asset_monitoring.Services
         public string Status { get; set; } = "OFF";
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
+    }
+
+    public class AssignOperatorRequest
+    {
+        public int PumpId { get; set; }
+        public string OperatorMobile { get; set; } = "";
+    }
+
+    public class PumpLogDto
+    {
+        public int LogId { get; set; }
+        public string OldStatus { get; set; } = "-";
+        public string NewStatus { get; set; } = "";
+        public DateTime? StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public int? DurationMinutes { get; set; }
+        public string? Remarks { get; set; }
+        public string? UpdatedBy { get; set; }
     }
 
     public class PumpDashboardService
@@ -214,7 +234,7 @@ namespace asset_monitoring.Services
                     location.RowUpdationDateTime = now;
                 }
 
-                // 3. PumpStatusEntry (upsert)
+                // 3. PumpStatusEntry (upsert) — write log entry when status changes
                 var newStatus = req.Status.ToUpperInvariant() switch
                 {
                     "ON"          => PumpStatus.On,
@@ -229,6 +249,9 @@ namespace asset_monitoring.Services
                     {
                         PumpId               = req.PumpId,
                         Status               = newStatus,
+                        Remarks              = req.Remarks,
+                        UpdatedBy            = req.UpdatedBy,
+                        CurrentStartTime     = newStatus == PumpStatus.On ? now : null,
                         RowActionCount       = 1,
                         RowInsertionDateTime = now,
                         RowUpdationDateTime  = now
@@ -236,8 +259,42 @@ namespace asset_monitoring.Services
                 }
                 else
                 {
-                    entry.Status               = newStatus;
-                    entry.RowUpdationDateTime  = now;
+                    var oldStatus = entry.Status;
+
+                    // Write audit log whenever the status actually changes
+                    if (oldStatus != newStatus)
+                    {
+                        _db.PumpStatusLogs.Add(new PumpStatusLog
+                        {
+                            PumpId               = req.PumpId,
+                            OldStatus            = oldStatus,
+                            NewStatus            = newStatus,
+                            StartTime            = entry.CurrentStartTime,
+                            EndTime              = newStatus != PumpStatus.On ? now : null,
+                            Remarks              = req.Remarks,
+                            UpdatedBy            = req.UpdatedBy,
+                            RowInsertionDateTime = now,
+                            RowUpdationDateTime  = now
+                        });
+
+                        Logger.Info("UpdatePumpDetailsAsync: pumpId={0} status {1}→{2}",
+                            req.PumpId, oldStatus, newStatus);
+                    }
+
+                    // Track running time: set start when turning ON, set end when turning OFF
+                    if (newStatus == PumpStatus.On && oldStatus != PumpStatus.On)
+                        entry.CurrentStartTime = now;
+                    else if (newStatus != PumpStatus.On && oldStatus == PumpStatus.On)
+                    {
+                        entry.CurrentEndTime = now;
+                        entry.LastRunTime    = now;
+                    }
+
+                    entry.Status              = newStatus;
+                    entry.Remarks             = req.Remarks;
+                    entry.UpdatedBy           = req.UpdatedBy;
+                    entry.RowActionCount     += 1;
+                    entry.RowUpdationDateTime = now;
                 }
 
                 await _db.SaveChangesAsync();
@@ -250,6 +307,78 @@ namespace asset_monitoring.Services
                 throw;
             }
         }
+
+        // ── Get pump log history ──────────────────────────────────────────────
+        public async Task<List<PumpLogDto>> GetPumpLogsAsync(int pumpId)
+        {
+            Logger.Debug("GetPumpLogsAsync: pumpId={0}", pumpId);
+            try
+            {
+                // Fetch raw rows first — arithmetic on DateTime? can't be translated to MySQL
+                var rows = await _db.PumpStatusLogs
+                    .Where(l => l.PumpId == pumpId)
+                    .OrderByDescending(l => l.RowInsertionDateTime)
+                    .Take(50)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                return rows.Select(l => new PumpLogDto
+                {
+                    LogId           = l.LogId,
+                    OldStatus       = l.OldStatus.HasValue
+                                        ? StatusLabel(l.OldStatus.Value) : "-",
+                    NewStatus       = StatusLabel(l.NewStatus),
+                    StartTime       = l.StartTime,
+                    EndTime         = l.EndTime,
+                    DurationMinutes = l.StartTime.HasValue && l.EndTime.HasValue
+                                        ? (int)(l.EndTime.Value - l.StartTime.Value).TotalMinutes
+                                        : null,
+                    Remarks         = l.Remarks,
+                    UpdatedBy       = l.UpdatedBy
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "GetPumpLogsAsync failed for pumpId={0}", pumpId);
+                throw;
+            }
+        }
+
+        // ── Assign operator to pump ───────────────────────────────────────────
+        public async Task<bool> AssignOperatorAsync(AssignOperatorRequest req)
+        {
+            Logger.Info("AssignOperatorAsync: pumpId={0}, operator={1}", req.PumpId, req.OperatorMobile);
+            try
+            {
+                var entry = await _db.PumpStatusEntries.FindAsync(req.PumpId);
+                if (entry == null)
+                {
+                    Logger.Warn("AssignOperatorAsync: no status entry for pumpId={0}", req.PumpId);
+                    return false;
+                }
+
+                entry.UpdatedBy           = req.OperatorMobile;
+                entry.RowUpdationDateTime = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+
+                _cache.Remove(ADMIN_CACHE_KEY);
+                Logger.Info("AssignOperatorAsync: pumpId={0} assigned to {1}", req.PumpId, req.OperatorMobile);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "AssignOperatorAsync failed for pumpId={0}", req.PumpId);
+                throw;
+            }
+        }
+
+        // ── Private helpers ───────────────────────────────────────────────────
+        private static string StatusLabel(PumpStatus s) => s switch
+        {
+            PumpStatus.On          => "ON",
+            PumpStatus.Maintenance => "MAINTENANCE",
+            _                      => "OFF"
+        };
 
         // ── Add new pump (master + location rows) ─────────────────────────────
         public async Task<int> AddPumpAsync(AddPumpRequest req)

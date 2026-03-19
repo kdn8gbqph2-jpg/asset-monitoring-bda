@@ -139,6 +139,68 @@ html {
     opacity: 1;
 }
 
+/* Status filter header */
+.table-dashboard th.th-filter {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.table-dashboard th.th-filter:hover {
+    background-color: #1d4ed8 !important;
+}
+
+.table-dashboard th.filter-active {
+    background-color: #1e40af !important;
+}
+
+.filter-icon {
+    font-size: 0.8rem;
+    margin-left: 4px;
+    opacity: 0.75;
+    pointer-events: none;
+}
+
+.table-dashboard th.filter-active .filter-icon {
+    opacity: 1;
+}
+
+/* Dropdown panel */
+.status-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 999;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 160px;
+    padding: 4px 0;
+    color: #212529;
+}
+
+.status-dropdown.open {
+    display: block;
+}
+
+.status-dropdown-item {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.status-dropdown-item:hover {
+    background-color: #f0f6ff;
+}
+
+.status-dropdown-item.selected {
+    background-color: #e0ecff;
+    font-weight: 600;
+}
+
 /* Status badges */
 .badge-status-on {
     background: #e6f9ed;

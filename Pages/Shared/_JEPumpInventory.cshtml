@@ -1,0 +1,61 @@
+@model IEnumerable<asset_monitoring.Services.DashboardPumpDto>
+
+<div class="card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-semibold text-primary m-0">
+            <i class="bi bi-database-fill icon-title"></i>
+            Pump Overview
+        </h5>
+        <button type="button"
+                class="btn btn-outline-primary btn-sm"
+                onclick="window.location.href='?handler=DownloadReport'">
+            <i class="bi bi-file-earmark-excel"></i> Download Report
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-dashboard align-middle">
+            <thead>
+                <tr>
+                    <th>PUMP ID</th>
+                    <th>VENDOR</th>
+                    <th>LOCATION</th>
+                    <th>OPERATOR</th>
+                    <th>STATUS</th>
+                    <th>ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pump in Model)
+                {
+                    <tr>
+                        <td>@pump.PumpId</td>
+                        <td>@pump.VendorName</td>
+                        <td>@pump.Location</td>
+                        <td>@(pump.MobileNumber ?? "—")</td>
+                        <td>
+                            @if (pump.Status == "ON")
+                            {
+                                <span class="badge-status-on">ON</span>
+                            }
+                            else if (pump.Status == "MAINTENANCE")
+                            {
+                                <span class="badge bg-warning text-dark">MAINTENANCE</span>
+                            }
+                            else
+                            {
+                                <span class="badge-status-off">OFF</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    onclick="openAssignOperator(@pump.PumpId, '@(pump.MobileNumber ?? "")')">
+                                <i class="bi bi-person-check"></i> Assign
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

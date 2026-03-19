@@ -138,6 +138,10 @@ namespace asset_monitoring.Pages
             {
                 return RedirectToPage("/Operator");
             }
+            else if (user.UserType == "BDA_OFFICIAL")
+            {
+                return RedirectToPage("/JuniorEngineer");
+            }
 
             await OnGetAsync();
             return Page();
@@ -168,6 +172,21 @@ namespace asset_monitoring.Pages
             public DateTime? LastRun { get; init; }
             public string? MobileNumber { get; init; } // <-- Add this line
         }
+        public async Task<JsonResult> OnGetPumpLogsAsync(int pumpId)
+        {
+            Logger.Info("OnGetPumpLogsAsync: pumpId={0}", pumpId);
+            try
+            {
+                var logs = await _PumpdashboardService.GetPumpLogsAsync(pumpId);
+                return new JsonResult(new { success = true, logs });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnGetPumpLogsAsync failed for pumpId={0}", pumpId);
+                return new JsonResult(new { success = false, message = "Failed to load logs" });
+            }
+        }
+
         public IActionResult OnGetDownloadReport()
         {
 

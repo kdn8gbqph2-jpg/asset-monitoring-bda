@@ -19,6 +19,7 @@
         document.getElementById("editStatus").value       = status    ?? "OFF";
         document.getElementById("editLatitude").value     = latitude  ?? "";
         document.getElementById("editLongitude").value    = longitude ?? "";
+        document.getElementById("editRemarks").value      = "";
 
         // Restore title + save button for edit mode
         document.getElementById("pumpDrawerTitle").innerHTML =
@@ -48,7 +49,8 @@
                 Status:       document.getElementById("editStatus").value,
                 Latitude:     isNaN(latRaw) ? null : latRaw,
                 Longitude:    isNaN(lngRaw) ? null : lngRaw,
-                IsActive:     true
+                IsActive:     true,
+                Remarks:      document.getElementById("editRemarks").value || null
             })
         })
         .then(r => r.json())
@@ -67,6 +69,7 @@
         document.getElementById("editStatus").value       = "OFF";
         document.getElementById("editLatitude").value     = "";
         document.getElementById("editLongitude").value    = "";
+        document.getElementById("editRemarks").value      = "";
 
         document.getElementById("pumpDrawerTitle").innerHTML =
             '<i class="bi bi-plus-circle"></i> Add Pump';
@@ -93,7 +96,8 @@
                 LocationName: document.getElementById("editLocationName").value,
                 Status:       document.getElementById("editStatus").value,
                 Latitude:     isNaN(latRaw) ? null : latRaw,
-                Longitude:    isNaN(lngRaw) ? null : lngRaw
+                Longitude:    isNaN(lngRaw) ? null : lngRaw,
+                Remarks:      document.getElementById("editRemarks").value || null
             })
         })
         .then(r => r.json())
