@@ -91,11 +91,11 @@
                 <table class="table table-dashboard mb-2 align-middle">
                     <thead>
                         <tr>
-                            <th>Pump ID</th>
-                            <th>Vendor</th>
-                            <th>Location</th>
-                            <th>Mobile</th>
-                            <th>Status</th>
+                            <th class="sortable" data-col="0" data-type="num">Pump ID <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="1" data-type="str">Vendor <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="2" data-type="str">Location <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="3" data-type="str">Mobile <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="4" data-type="str">Status <span class="sort-icon">⇅</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -299,6 +299,70 @@
             currentView = null;
             setTimeout(() => map.invalidateSize(), 300);
         }
+    </script>
+
+    <script>
+        // ── Excel-style column sorting ──────────────────────────────────────
+        (function () {
+            // Track sort state per column: 'none' → 'asc' → 'desc' → 'none'
+            const sortState = {};
+
+            document.querySelectorAll('.table-dashboard th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const col   = parseInt(th.dataset.col);
+                    const type  = th.dataset.type;   // 'num' | 'str'
+                    const table = th.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const rows  = Array.from(tbody.querySelectorAll('tr'));
+                    const icon  = th.querySelector('.sort-icon');
+
+                    // Cycle: none → asc → desc → none
+                    const current = sortState[col] || 'none';
+                    const next    = current === 'none' ? 'asc'
+                                  : current === 'asc'  ? 'desc'
+                                  : 'none';
+                    sortState[col] = next;
+
+                    // Reset all headers
+                    document.querySelectorAll('.table-dashboard th.sortable').forEach(h => {
+                        h.classList.remove('sort-asc', 'sort-desc');
+                        h.querySelector('.sort-icon').textContent = '⇅';
+                    });
+
+                    if (next === 'none') {
+                        // Restore original server-rendered order via data-index
+                        rows.sort((a, b) =>
+                            parseInt(a.dataset.origIndex) - parseInt(b.dataset.origIndex)
+                        );
+                        icon.textContent = '⇅';
+                    } else {
+                        th.classList.add(next === 'asc' ? 'sort-asc' : 'sort-desc');
+                        icon.textContent = next === 'asc' ? '▲' : '▼';
+
+                        rows.sort((a, b) => {
+                            const aVal = a.cells[col].textContent.trim();
+                            const bVal = b.cells[col].textContent.trim();
+
+                            let cmp;
+                            if (type === 'num') {
+                                cmp = parseFloat(aVal || 0) - parseFloat(bVal || 0);
+                            } else {
+                                cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
+                            }
+                            return next === 'asc' ? cmp : -cmp;
+                        });
+                    }
+
+                    // Re-attach rows in new order
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+
+            // Stamp each row with its original index so we can restore order
+            document.querySelectorAll('.table-dashboard tbody tr').forEach((tr, i) => {
+                tr.dataset.origIndex = i;
+            });
+        })();
     </script>
 
 

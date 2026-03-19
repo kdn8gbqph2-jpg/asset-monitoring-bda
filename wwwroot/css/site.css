@@ -112,6 +112,33 @@ html {
     background-color: #f0f6ff;
 }
 
+/* Sortable column headers */
+.table-dashboard th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.table-dashboard th.sortable:hover {
+    background-color: #1d4ed8 !important;
+}
+
+.table-dashboard th.sort-asc,
+.table-dashboard th.sort-desc {
+    background-color: #1e40af !important;
+}
+
+.sort-icon {
+    font-size: 0.75rem;
+    opacity: 0.55;
+    margin-left: 4px;
+    pointer-events: none;
+}
+
+.table-dashboard th.sort-asc .sort-icon,
+.table-dashboard th.sort-desc .sort-icon {
+    opacity: 1;
+}
+
 /* Status badges */
 .badge-status-on {
     background: #e6f9ed;
