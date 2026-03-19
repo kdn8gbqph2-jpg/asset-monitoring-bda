@@ -356,6 +356,20 @@ html {
     color: #fff;
     border-color: #0d6efd;
 }
+
+/* Reset button — subtle pulse on hover to hint it does something */
+#btnReset {
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+#btnReset:hover {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+    transform: scale(1.06);
+}
+
+#btnReset:active {
+    transform: scale(0.96);
+}
 .dashboard-title {
     font-size: 1.75rem; 
 }

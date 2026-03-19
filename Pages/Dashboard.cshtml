@@ -69,10 +69,20 @@
     </div>
 
     <!-- ================= MAP / LIST TOGGLE ================= -->
-    <div class="mb-3">
+    <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div class="d-flex gap-2">
-            <button class="btn btn-primary btn-sm view-btn" id="btnMap">MAP VIEW</button>
-            <button class="btn btn-outline-secondary btn-sm view-btn" id="btnList">LIST VIEW</button>
+            <button class="btn btn-primary btn-sm view-btn" id="btnMap">
+                <i class="bi bi-map"></i> Map View
+            </button>
+            <button class="btn btn-outline-secondary btn-sm view-btn" id="btnList">
+                <i class="bi bi-list-ul"></i> List View
+            </button>
+            <button class="btn btn-outline-danger btn-sm" id="btnReset" title="Reset view, filters and sort">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
+        </div>
+        <div id="activeFiltersBar" class="d-none small text-muted fst-italic">
+            <!-- shows active filter / sort hints -->
         </div>
     </div>
 
@@ -344,35 +354,29 @@
         setInterval(loadPumpMarkers, 30000);
     </script>
     <script>
-        const dashboardRow = document.getElementById('dashboardRow');
-        const btnMap = document.getElementById('btnMap');
-        const btnList = document.getElementById('btnList');
+        const dashboardRow    = document.getElementById('dashboardRow');
+        const btnMap          = document.getElementById('btnMap');
+        const btnList         = document.getElementById('btnList');
+        const btnReset        = document.getElementById('btnReset');
+        const activeFiltersBar = document.getElementById('activeFiltersBar');
 
         let currentView = null; // 'map' | 'list' | null
 
         btnMap.addEventListener('click', () => {
-            if (currentView === 'map') {
-                resetView();
-            } else {
-                expandMap();
-            }
+            if (currentView === 'map') { resetView(); } else { expandMap(); }
         });
 
         btnList.addEventListener('click', () => {
-            if (currentView === 'list') {
-                resetView();
-            } else {
-                expandList();
-            }
+            if (currentView === 'list') { resetView(); } else { expandList(); }
         });
+
+        btnReset.addEventListener('click', () => fullReset());
 
         function expandMap() {
             dashboardRow.classList.remove('expand-list');
             dashboardRow.classList.add('expand-map');
-
             btnMap.classList.add('active');
             btnList.classList.remove('active');
-
             currentView = 'map';
             setTimeout(() => map.invalidateSize(), 300);
         }
@@ -380,21 +384,69 @@
         function expandList() {
             dashboardRow.classList.remove('expand-map');
             dashboardRow.classList.add('expand-list');
-
             btnList.classList.add('active');
             btnMap.classList.remove('active');
-
             currentView = 'list';
         }
 
         function resetView() {
             dashboardRow.classList.remove('expand-map', 'expand-list');
-
             btnMap.classList.remove('active');
             btnList.classList.remove('active');
-
             currentView = null;
             setTimeout(() => map.invalidateSize(), 300);
+        }
+
+        // ── Full reset: view + sort + status filter ───────────────────────
+        function fullReset() {
+            // 1. Reset view
+            resetView();
+
+            // 2. Reset column sort — restore original row order
+            const tbody = document.querySelector('.table-dashboard tbody');
+            const rows  = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a, b) =>
+                parseInt(a.dataset.origIndex || 0) - parseInt(b.dataset.origIndex || 0)
+            );
+            rows.forEach(r => tbody.appendChild(r));
+
+            // Clear sort icons + state
+            document.querySelectorAll('.table-dashboard th.sortable').forEach(h => {
+                h.classList.remove('sort-asc', 'sort-desc');
+                const icon = h.querySelector('.sort-icon');
+                if (icon) icon.textContent = '⇅';
+            });
+
+            // 3. Reset status filter — show all rows
+            document.querySelectorAll('.table-dashboard tbody tr')
+                .forEach(tr => tr.style.display = '');
+
+            // Reset filter header icon + selection highlight
+            const thStatus  = document.getElementById('thStatus');
+            const dropdown  = document.getElementById('statusDropdown');
+            if (thStatus) {
+                const filterIcon = thStatus.querySelector('.filter-icon');
+                if (filterIcon) filterIcon.textContent = '▾';
+                thStatus.classList.remove('filter-active');
+            }
+            if (dropdown) {
+                dropdown.querySelectorAll('.status-dropdown-item')
+                    .forEach(i => i.classList.remove('selected'));
+                dropdown.classList.remove('open');
+            }
+
+            // 4. Spin the reset icon for visual feedback
+            const icon = btnReset.querySelector('i');
+            icon.style.transition = 'transform 0.5s ease';
+            icon.style.transform  = 'rotate(-360deg)';
+            setTimeout(() => {
+                icon.style.transition = '';
+                icon.style.transform  = '';
+            }, 500);
+
+            // 5. Hide filters bar hint
+            activeFiltersBar.classList.add('d-none');
+            activeFiltersBar.textContent = '';
         }
     </script>
 
