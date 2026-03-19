@@ -87,8 +87,8 @@
         </div>
         <div class="col-12 col-md-6" id="tableCol">
             <div class="card h-100 d-flex flex-column">
-                <div class="table-responsive flex-grow-1">
-                <table class="table table-dashboard mb-2 align-middle">
+                <div class="table-responsive">
+                <table class="table table-dashboard mb-0 align-middle">
                     <thead>
                         <tr>
                             <th class="sortable" data-col="0" data-type="num">Pump ID <span class="sort-icon">⇅</span></th>
@@ -163,16 +163,17 @@
                         }
                     </tbody>
                 </table>
-                <div class="d-flex justify-content-end">
+                </div><!-- /table-responsive -->
+                <!-- Fixed footer — sits at the bottom of the card regardless of scroll -->
+                <div class="d-flex justify-content-end pt-2 flex-shrink-0">
                     <button class="btn btn-primary btn-sm">
                         <i class="bi bi-exclamation-circle"></i> Report Issue
                     </button>
                 </div>
-            </div>
-        </div>
-        </div>
-    </div>
-</div>
+            </div><!-- /card -->
+        </div><!-- /tableCol -->
+    </div><!-- /dashboardRow -->
+</div><!-- /container -->
 
 <!-- ================= PUMP DETAIL MODAL ================= -->
 <div class="modal fade" id="pumpDetailModal" tabindex="-1">
