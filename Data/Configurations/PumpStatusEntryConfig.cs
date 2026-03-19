@@ -39,6 +39,10 @@ namespace asset_monitoring.Data.Configurations
                   .HasColumnName("updated_by")
                   .HasMaxLength(100);
 
+            entity.Property(e => e.JeMobile)
+                  .HasColumnName("je_mobile")
+                  .HasMaxLength(15);
+
             entity.Property(e => e.RowActionCount)
                   .HasColumnName("row_action_count")
                   .HasDefaultValue(1);

@@ -113,6 +113,14 @@ namespace asset_monitoring.Services
                         operatorMobile, userId);
                 }
 
+                // Build a mobile→name lookup from user master (small table — cheap)
+                var userMap = (await _db.BdaUserMasters
+                    .Where(u => u.IsActive && u.MobileNumber != null)
+                    .AsNoTracking()
+                    .Select(u => new { u.MobileNumber, u.Name })
+                    .ToListAsync())
+                    .ToDictionary(u => u.MobileNumber!, u => u.Name ?? "");
+
                 // Join pump master → location (left) → status entry (left)
                 var rawData = await (
                     from pump in _db.BdaPumpMasters
@@ -126,13 +134,14 @@ namespace asset_monitoring.Services
                     {
                         pump.PumpId,
                         pump.VendorName,
-                        LocationName     = loc   != null ? loc.LocationName        : null,
-                        Latitude         = loc   != null ? loc.Latitude            : (decimal?)null,
-                        Longitude        = loc   != null ? loc.Longitude           : (decimal?)null,
+                        LocationName     = loc   != null ? loc.LocationName          : null,
+                        Latitude         = loc   != null ? loc.Latitude              : (decimal?)null,
+                        Longitude        = loc   != null ? loc.Longitude             : (decimal?)null,
                         EntryStatus      = entry != null ? (PumpStatus?)entry.Status : null,
-                        CurrentStartTime = entry != null ? entry.CurrentStartTime  : (DateTime?)null,
+                        CurrentStartTime = entry != null ? entry.CurrentStartTime    : (DateTime?)null,
                         LastUpdated      = entry != null ? entry.RowUpdationDateTime : pump.RowUpdationDateTime,
-                        OperatorMobile   = entry != null ? entry.UpdatedBy         : null
+                        OperatorMobile   = entry != null ? entry.UpdatedBy           : null,
+                        JeMobile         = entry != null ? entry.JeMobile            : null
                     }
                 ).AsNoTracking().ToListAsync();
 
@@ -150,11 +159,14 @@ namespace asset_monitoring.Services
                         PumpStatus.Maintenance => "MAINTENANCE",
                         _                      => "OFF"
                     },
-                    RunningMinutes = r.EntryStatus == PumpStatus.On && r.CurrentStartTime.HasValue
+                    RunningMinutes  = r.EntryStatus == PumpStatus.On && r.CurrentStartTime.HasValue
                         ? (int)(DateTime.UtcNow - r.CurrentStartTime.Value).TotalMinutes
                         : 0,
-                    LastUpdated    = r.LastUpdated,
-                    MobileNumber   = r.OperatorMobile
+                    LastUpdated     = r.LastUpdated,
+                    OperatorMobile  = r.OperatorMobile,
+                    OperatorName    = r.OperatorMobile != null && userMap.TryGetValue(r.OperatorMobile, out var opN) ? opN : null,
+                    JeMobile        = r.JeMobile,
+                    JeName          = r.JeMobile != null && userMap.TryGetValue(r.JeMobile, out var jeN) ? jeN : null,
                 }).ToList();
 
                 Logger.Debug("FetchFromDatabaseAsync: {0} pumps for userId={1}, userType={2}",
@@ -438,6 +450,13 @@ namespace asset_monitoring.Services
         public string? Status { get; set; }
         public int RunningMinutes { get; set; }
         public DateTime LastUpdated { get; set; }
-        public string? MobileNumber { get; set; }
+        // Operator
+        public string? OperatorName { get; set; }
+        public string? OperatorMobile { get; set; }
+        // Junior Engineer
+        public string? JeName { get; set; }
+        public string? JeMobile { get; set; }
+        /// <summary>Kept for backward compat — same as OperatorMobile.</summary>
+        public string? MobileNumber => OperatorMobile;
     }
 }

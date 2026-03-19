@@ -94,9 +94,12 @@
                             <th class="sortable" data-col="0" data-type="num">Pump ID <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="1" data-type="str">Vendor <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="2" data-type="str">Location <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="3" data-type="str">Mobile <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="4" data-type="num">Running <span class="sort-icon">⇅</span></th>
-                            <th class="th-filter" id="thStatus" data-col="5" style="position:relative;">
+                            <th class="sortable" data-col="3" data-type="str">Operator Name <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="4" data-type="str">Operator Mobile <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="5" data-type="str">JE Name <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="6" data-type="str">JE Mobile <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="7" data-type="num">Running <span class="sort-icon">⇅</span></th>
+                            <th class="th-filter" id="thStatus" data-col="8" style="position:relative;">
                                 Status <span class="filter-icon">▾</span>
                                 <div class="status-dropdown" id="statusDropdown">
                                     <div class="status-dropdown-item" data-val="">All</div>
@@ -119,7 +122,10 @@
                                 </td>
                                 <td>@p.VendorName</td>
                                 <td>@p.Location</td>
-                                <td>@p.MobileNumber</td>
+                                <td>@(p.OperatorName ?? "—")</td>
+                                <td>@(p.OperatorMobile ?? "—")</td>
+                                <td>@(p.JeName ?? "—")</td>
+                                <td>@(p.JeMobile ?? "—")</td>
                                 <td>
                                     @if (p.RunningMinutes > 0)
                                     {
@@ -549,7 +555,7 @@
 
                     // Filter rows
                     document.querySelectorAll('.table-dashboard tbody tr').forEach(tr => {
-                        const status = tr.cells[5].textContent.trim();
+                        const status = tr.cells[8].textContent.trim();
                         tr.style.display = (!activeFilter || status === activeFilter) ? '' : 'none';
                     });
 

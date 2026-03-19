@@ -74,11 +74,14 @@ namespace asset_monitoring.Pages
                 Location = p.Location,
                 Latitude = p.Latitude,
                 Longitude = p.Longitude,
-                Status = p.Status,
+                Status         = p.Status,
                 RunningMinutes = p.RunningMinutes,
-                LastUpdated = p.LastUpdated,
-                LastRun = null,
-                MobileNumber = p.MobileNumber
+                LastUpdated    = p.LastUpdated,
+                LastRun        = null,
+                OperatorName   = p.OperatorName,
+                OperatorMobile = p.OperatorMobile,
+                JeName         = p.JeName,
+                JeMobile       = p.JeMobile
             }).ToList();
 
             TotalPumps = Pumps.Count;
@@ -172,7 +175,10 @@ namespace asset_monitoring.Pages
             public int RunningMinutes { get; init; }
             public DateTime LastUpdated { get; init; }
             public DateTime? LastRun { get; init; }
-            public string? MobileNumber { get; init; }
+            public string? OperatorName { get; init; }
+            public string? OperatorMobile { get; init; }
+            public string? JeName { get; init; }
+            public string? JeMobile { get; init; }
         }
         public async Task<JsonResult> OnGetPumpLogsAsync(int pumpId)
         {
