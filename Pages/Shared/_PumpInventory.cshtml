@@ -1,8 +1,9 @@
 @model IEnumerable<asset_monitoring.Services.DashboardPumpDto>
 @{
-    var userType = Context.Session.GetString("UserType");
-    var isAdmin  = userType == "ADMIN";
-    var isJE     = userType == "JE";
+    var userType    = Context.Session.GetString("UserType");
+    var isAdmin     = userType == "ADMIN";
+    var isJE        = userType == "JE";
+    var isOperator  = userType == "OPERATOR";
 }
 
 <div class="card mb-4">
@@ -107,6 +108,23 @@
 
                         <!-- Actions -->
                         <td class="text-nowrap">
+                            @* Change Status — Operator *@
+                            @if (isOperator)
+                            {
+                                <button class="btn btn-warning btn-sm change-status-btn"
+                                        data-pump-id="@pump.PumpId"
+                                        data-vendor="@(pump.VendorName ?? "")"
+                                        data-location="@(pump.Location ?? "")"
+                                        data-status="@pump.Status"
+                                        data-lat="@(pump.Latitude?.ToString() ?? "")"
+                                        data-lng="@(pump.Longitude?.ToString() ?? "")"
+                                        data-operator-mobile="@(pump.OperatorMobile ?? "")"
+                                        data-je-mobile="@(pump.JeMobile ?? "")"
+                                        title="Change Status">
+                                    <i class="bi bi-toggle-on"></i> Change Status
+                                </button>
+                            }
+
                             @* Edit pump — Admin and JE *@
                             @if (isAdmin || isJE)
                             {

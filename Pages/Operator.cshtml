@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model asset_monitoring.Pages.OperatorModel
 @{
     ViewData["Title"] = "Operator Panel";
@@ -15,6 +15,128 @@
     @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
 </div>
 
-<!-- Pump Editor Drawer -->
-@await Html.PartialAsync("_EditPumpDrawer")
+<!-- Change Status Modal -->
+<div class="modal fade" id="changeStatusModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-toggle-on me-2"></i>Change Pump Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="csModalPumpId" />
+                <input type="hidden" id="csModalVendor" />
+                <input type="hidden" id="csModalLocation" />
+                <input type="hidden" id="csModalLat" />
+                <input type="hidden" id="csModalLng" />
+                <input type="hidden" id="csModalOperatorMobile" />
+                <input type="hidden" id="csModalJeMobile" />
 
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Pump</label>
+                    <div id="csModalPumpInfo" class="text-muted small"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">New Status</label>
+                    <select class="form-select" id="csModalStatus">
+                        <option value="ON">ON</option>
+                        <option value="OFF">OFF</option>
+                        <option value="MAINTENANCE">MAINTENANCE</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Remarks <span class="text-muted fw-normal">(optional)</span></label>
+                    <textarea class="form-control" id="csModalRemarks" rows="3"
+                              placeholder="e.g. Power outage, scheduled maintenance…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="csModalSaveBtn" onclick="saveStatusChange()">
+                    <i class="bi bi-check-circle me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/admin-drawer.js"></script>
+    <script>
+        let csModal = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            csModal = new bootstrap.Modal(document.getElementById('changeStatusModal'));
+
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('.change-status-btn');
+                if (!btn) return;
+
+                document.getElementById('csModalPumpId').value        = btn.dataset.pumpId;
+                document.getElementById('csModalVendor').value         = btn.dataset.vendor;
+                document.getElementById('csModalLocation').value       = btn.dataset.location;
+                document.getElementById('csModalLat').value            = btn.dataset.lat;
+                document.getElementById('csModalLng').value            = btn.dataset.lng;
+                document.getElementById('csModalOperatorMobile').value = btn.dataset.operatorMobile;
+                document.getElementById('csModalJeMobile').value       = btn.dataset.jeMobile;
+
+                document.getElementById('csModalStatus').value  = btn.dataset.status || 'OFF';
+                document.getElementById('csModalRemarks').value = '';
+                document.getElementById('csModalPumpInfo').textContent =
+                    `Pump #${btn.dataset.pumpId} — ${btn.dataset.vendor || ''}` +
+                    (btn.dataset.location ? ` (${btn.dataset.location})` : '');
+
+                csModal.show();
+            });
+        });
+
+        async function saveStatusChange() {
+            const saveBtn = document.getElementById('csModalSaveBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const lat = parseFloat(document.getElementById('csModalLat').value);
+            const lng = parseFloat(document.getElementById('csModalLng').value);
+            const payload = {
+                pumpId:         parseInt(document.getElementById('csModalPumpId').value),
+                vendorName:     document.getElementById('csModalVendor').value,
+                locationName:   document.getElementById('csModalLocation').value,
+                latitude:       isNaN(lat) ? null : lat,
+                longitude:      isNaN(lng) ? null : lng,
+                operatorMobile: document.getElementById('csModalOperatorMobile').value || null,
+                jeMobile:       document.getElementById('csModalJeMobile').value || null,
+                status:         document.getElementById('csModalStatus').value,
+                remarks:        document.getElementById('csModalRemarks').value.trim() || null,
+                isActive:       true
+            };
+
+            try {
+                const res = await fetch('?handler=UpdatePump', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    csModal.hide();
+                    location.reload();
+                } else {
+                    alert('Failed to update status: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Save';
+            }
+        }
+    </script>
+}
