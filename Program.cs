@@ -1,5 +1,6 @@
 using asset_monitoring.Data;
 using asset_monitoring.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using NLog;
 using NLog.Web;
@@ -35,27 +36,45 @@ try
 
     builder.Services.AddSession(options =>
     {
-        options.IdleTimeout = TimeSpan.FromMinutes(30);
-        options.Cookie.HttpOnly = true;
+        options.IdleTimeout      = TimeSpan.FromMinutes(30);
+        options.Cookie.HttpOnly  = true;
         options.Cookie.IsEssential = true;
+        // Mark the session cookie as Secure when running behind HTTPS proxy
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    });
+
+    // Trust the X-Forwarded-* headers sent by Nginx
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // Only trust localhost (Nginx runs on same machine)
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
     });
 
     var app = builder.Build();
 
+    // Must be first — reads X-Forwarded-Proto so HTTPS detection works correctly
+    app.UseForwardedHeaders();
+
     if (!app.Environment.IsDevelopment())
     {
         app.UseExceptionHandler("/Error");
+        // HSTS handled by Nginx in production; skip in non-dev to avoid double headers
+    }
+    else
+    {
         app.UseHsts();
+        app.UseHttpsRedirection();
     }
 
-    app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseRouting();
     app.UseSession();
     app.UseAuthorization();
     app.MapRazorPages();
 
-    logger.Info("Application starting up");
+    logger.Info("Application starting — Environment={0}", app.Environment.EnvironmentName);
     app.Run();
 }
 catch (Exception ex)

@@ -1,0 +1,38 @@
+[Unit]
+Description=BDA Asset Monitoring – ASP.NET Core 8
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=notify
+User=bda
+Group=bda
+WorkingDirectory=/var/www/asset-monitoring
+
+# ── Runtime ────────────────────────────────────────────────────────────────
+ExecStart=/var/www/asset-monitoring/asset-monitoring
+
+# ── Environment ────────────────────────────────────────────────────────────
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5000
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+# Connection string — edit this line with your production DB credentials
+# Format: Server=HOST;Port=3306;Database=DB_NAME;User=DB_USER;Password=DB_PASS
+Environment="ConnectionStrings__DefaultConnection=Server=localhost;Port=3306;Database=bda_core_prod;User=bda_user;Password=CHANGE_ME"
+
+# ── Reliability ────────────────────────────────────────────────────────────
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# ── Security hardening ─────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+# Allow write access to the app directory (logs)
+ReadWritePaths=/var/www/asset-monitoring/logs
+
+[Install]
+WantedBy=multi-user.target
