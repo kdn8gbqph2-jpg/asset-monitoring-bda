@@ -66,7 +66,7 @@
     <!-- ================= MAP / LIST TOGGLE ================= -->
     <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div class="d-flex gap-2 align-items-center">
-            <button class="btn btn-primary btn-sm view-btn" id="btnMap">
+            <button class="btn btn-outline-secondary btn-sm view-btn" id="btnMap">
                 <i class="bi bi-map"></i> Map View
             </button>
             <button class="btn btn-outline-secondary btn-sm view-btn" id="btnList">
@@ -162,11 +162,6 @@
                 </table>
                 </div><!-- /table-responsive -->
                 <!-- Fixed footer — sits at the bottom of the card regardless of scroll -->
-                <div class="d-flex justify-content-end pt-2 flex-shrink-0 px-3 pb-3">
-                    <button class="btn btn-primary btn-sm">
-                        <i class="bi bi-exclamation-circle"></i> Report Issue
-                    </button>
-                </div>
             </div><!-- /card -->
         </div><!-- /tableCol -->
     </div><!-- /dashboardRow -->
@@ -394,8 +389,10 @@
         function expandMap() {
             dashboardRow.classList.remove('expand-list');
             dashboardRow.classList.add('expand-map');
-            btnMap.classList.add('active');
-            btnList.classList.remove('active');
+            btnMap.classList.add('active', 'btn-primary');
+            btnMap.classList.remove('btn-outline-secondary');
+            btnList.classList.remove('active', 'btn-primary');
+            btnList.classList.add('btn-outline-secondary');
             currentView = 'map';
             setTimeout(() => map.invalidateSize(), 300);
         }
@@ -403,15 +400,19 @@
         function expandList() {
             dashboardRow.classList.remove('expand-map');
             dashboardRow.classList.add('expand-list');
-            btnList.classList.add('active');
-            btnMap.classList.remove('active');
+            btnList.classList.add('active', 'btn-primary');
+            btnList.classList.remove('btn-outline-secondary');
+            btnMap.classList.remove('active', 'btn-primary');
+            btnMap.classList.add('btn-outline-secondary');
             currentView = 'list';
         }
 
         function resetView() {
             dashboardRow.classList.remove('expand-map', 'expand-list');
-            btnMap.classList.remove('active');
-            btnList.classList.remove('active');
+            btnMap.classList.remove('active', 'btn-primary');
+            btnMap.classList.add('btn-outline-secondary');
+            btnList.classList.remove('active', 'btn-primary');
+            btnList.classList.add('btn-outline-secondary');
             currentView = null;
             setTimeout(() => map.invalidateSize(), 300);
         }
