@@ -12,22 +12,15 @@
 
         <div>
             <div class="btn-group me-2">
-                <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-download"></i> Download Report
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="?handler=DownloadReportXlsx">
-                        <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel (.xlsx)
-                    </a></li>
-                    <li><a class="dropdown-item" href="?handler=DownloadReportPdf">
-                        <i class="bi bi-file-earmark-pdf text-danger me-1"></i> PDF (.pdf)
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="?handler=DownloadReport">
-                        <i class="bi bi-file-earmark-text text-secondary me-1"></i> CSV (.csv)
-                    </a></li>
-                </ul>
+                <a href="?handler=DownloadReportXlsx" class="btn btn-outline-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i> Excel
+                </a>
+                <a href="?handler=DownloadReportPdf" class="btn btn-outline-danger btn-sm" title="Download PDF">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                </a>
+                <a href="?handler=DownloadReport" class="btn btn-outline-secondary btn-sm" title="Download CSV">
+                    <i class="bi bi-file-earmark-text"></i> CSV
+                </a>
             </div>
 
             @if (isAdmin)

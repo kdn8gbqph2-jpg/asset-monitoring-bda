@@ -16,24 +16,15 @@
 <div class="dash-navbar">
     <div class="nav-actions">
         <button class="btn-nav">EN / HI</button>
-        <div class="dropdown">
-            <button class="btn-nav dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
-                    title="Download Report">
-                <i class="bi bi-download"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-start">
-                <li><a class="dropdown-item" href="?handler=DownloadReportXlsx">
-                    <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel (.xlsx)
-                </a></li>
-                <li><a class="dropdown-item" href="?handler=DownloadReportPdf">
-                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i> PDF (.pdf)
-                </a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="?handler=DownloadReport">
-                    <i class="bi bi-file-earmark-text text-secondary me-1"></i> CSV (.csv)
-                </a></li>
-            </ul>
-        </div>
+        <a href="?handler=DownloadReportXlsx" class="btn-nav" title="Download Excel">
+            <i class="bi bi-file-earmark-excel"></i>
+        </a>
+        <a href="?handler=DownloadReportPdf" class="btn-nav" title="Download PDF">
+            <i class="bi bi-file-earmark-pdf"></i>
+        </a>
+        <a href="?handler=DownloadReport" class="btn-nav" title="Download CSV">
+            <i class="bi bi-file-earmark-text"></i>
+        </a>
     </div>
     <div class="nav-title">Monsoon Pump Dashboard</div>
     <div class="nav-actions">
