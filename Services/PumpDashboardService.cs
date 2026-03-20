@@ -40,6 +40,7 @@ namespace asset_monitoring.Services
     {
         public int PumpId { get; set; }
         public string OperatorMobile { get; set; } = "";
+        public string? UpdatedBy { get; set; }
     }
 
     public class PumpLogDto
@@ -270,16 +271,6 @@ namespace asset_monitoring.Services
                     _             => PumpStatus.Off
                 };
 
-                // Look up operator's display name from mobile (for updated_by name storage)
-                string? operatorName = null;
-                if (!string.IsNullOrEmpty(req.OperatorMobile))
-                {
-                    operatorName = await _db.BdaUserMasters
-                        .Where(u => u.MobileNumber == req.OperatorMobile && u.IsActive)
-                        .Select(u => u.Name)
-                        .FirstOrDefaultAsync() ?? req.OperatorMobile;
-                }
-
                 var entry = await _db.PumpStatusEntries.FindAsync(req.PumpId);
                 if (entry == null)
                 {
@@ -288,7 +279,7 @@ namespace asset_monitoring.Services
                         PumpId               = req.PumpId,
                         Status               = newStatus,
                         Remarks              = req.Remarks,
-                        UpdatedBy            = operatorName,
+                        UpdatedBy            = req.UpdatedBy,
                         OperatorMobile       = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile,
                         JeMobile             = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile,
                         CurrentStartTime     = newStatus == PumpStatus.On ? now : null,
@@ -332,13 +323,11 @@ namespace asset_monitoring.Services
 
                     entry.Status              = newStatus;
                     entry.Remarks             = req.Remarks;
+                    entry.UpdatedBy           = req.UpdatedBy;
                     if (req.OperatorMobile != null)
-                    {
-                        entry.UpdatedBy      = operatorName;
-                        entry.OperatorMobile = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile;
-                    }
+                        entry.OperatorMobile  = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile;
                     if (req.JeMobile != null)
-                        entry.JeMobile  = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile;
+                        entry.JeMobile        = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile;
                     entry.RowActionCount     += 1;
                     entry.RowUpdationDateTime = now;
                 }
@@ -403,12 +392,7 @@ namespace asset_monitoring.Services
                     return false;
                 }
 
-                var opName = await _db.BdaUserMasters
-                    .Where(u => u.MobileNumber == req.OperatorMobile && u.IsActive)
-                    .Select(u => u.Name)
-                    .FirstOrDefaultAsync() ?? req.OperatorMobile;
-
-                entry.UpdatedBy           = opName;
+                entry.UpdatedBy           = req.UpdatedBy;
                 entry.OperatorMobile      = req.OperatorMobile;
                 entry.RowUpdationDateTime = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
@@ -615,22 +599,12 @@ namespace asset_monitoring.Services
                 RowUpdationDateTime  = now
             });
 
-            // Look up operator name for updated_by
-            string? opName = null;
-            if (!string.IsNullOrEmpty(req.OperatorMobile))
-            {
-                opName = await _db.BdaUserMasters
-                    .Where(u => u.MobileNumber == req.OperatorMobile && u.IsActive)
-                    .Select(u => u.Name)
-                    .FirstOrDefaultAsync() ?? req.OperatorMobile;
-            }
-
             // Seed an initial OFF status entry so the pump appears on the dashboard
             _db.PumpStatusEntries.Add(new PumpStatusEntry
             {
                 PumpId               = pump.PumpId,
                 Status               = PumpStatus.Off,
-                UpdatedBy            = opName,
+                UpdatedBy            = req.UpdatedBy,
                 OperatorMobile       = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile,
                 JeMobile             = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile,
                 RowActionCount       = 1,
