@@ -25,10 +25,8 @@
         <button class="btn-nav btn-nav-primary"
                 data-bs-toggle="modal"
                 data-bs-target="#loginModal">
-            <img src="~/images/user-logo.png"
-                 alt="User"
-                 style="height:22px;width:22px;filter:brightness(0) invert(1);vertical-align:middle;" />
-            <span style="vertical-align:middle;">Sign in</span>
+            <i class="bi bi-person-circle" style="font-size:1.1rem;vertical-align:middle;"></i>
+            <span style="vertical-align:middle; margin-left:5px;">Sign in</span>
         </button>
     </div>
 </div>
@@ -361,14 +359,14 @@
                 { icon: icon }
             );
 
-            const popup = `
+            const tooltip = `
                 <strong>${pump.vendorName}</strong><br/>
-                Location: ${pump.location ?? "-"}<br/>
+                Location: ${pump.location ?? "—"}<br/>
                 Status: ${pump.status}<br/>
                 Last Updated: ${new Date(pump.lastUpdated).toLocaleString()}
             `;
 
-            marker.bindPopup(popup);
+            marker.bindTooltip(tooltip, { sticky: true, direction: 'top', opacity: 0.95 });
             markersLayer.addLayer(marker);
         }
 
@@ -383,7 +381,7 @@
                 iconUrl: `/images/${iconFile}`,
                 iconSize: [25, 41],
                 iconAnchor: [12, 41],
-                popupAnchor: [1, -34]
+                tooltipAnchor: [1, -34]
             });
         }
 
