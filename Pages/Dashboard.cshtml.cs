@@ -159,6 +159,7 @@ namespace asset_monitoring.Pages
         public async Task<JsonResult> OnGetRefreshAsync()
         {
             Logger.Info("Dashboard refresh requested at {0}", DateTime.UtcNow);
+            _PumpdashboardService.InvalidateCache();
             await OnGetAsync();
             return new JsonResult(new
             {
