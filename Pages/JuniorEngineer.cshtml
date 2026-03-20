@@ -42,89 +42,15 @@
     </div>
 
     @await Html.PartialAsync("Shared/_JEPumpInventory", Model.Pumps)
+
+    <!-- Pump Running Summary -->
+    @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
 </div>
 
-<!-- ── Assign Operator Modal ─────────────────────────────────────────── -->
-<div class="modal fade" id="assignOperatorModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-person-check"></i> Assign Operator
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="aoPumpId" />
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Pump ID</label>
-                    <input type="text" class="form-control" id="aoPumpIdDisplay" readonly />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Operator Mobile Number</label>
-                    <input type="text" class="form-control" id="aoMobile"
-                           placeholder="e.g. 9876543210" maxlength="15" />
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveAssignment()">
-                    <i class="bi bi-check-circle"></i> Assign
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Pump Editor Drawer (reuse shared partial) -->
+@await Html.PartialAsync("_EditPumpDrawer")
 
 @section Scripts {
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        function getToken() {
-            return document.querySelector('input[name="__RequestVerificationToken"]').value;
-        }
-
-        function openAssignOperator(pumpId, currentMobile) {
-            document.getElementById('aoPumpId').value        = pumpId;
-            document.getElementById('aoPumpIdDisplay').value = pumpId;
-            document.getElementById('aoMobile').value        = currentMobile ?? '';
-
-            const modal = bootstrap.Modal.getOrCreateInstance(
-                document.getElementById('assignOperatorModal'));
-            modal.show();
-        }
-
-        function saveAssignment() {
-            const pumpId = parseInt(document.getElementById('aoPumpId').value);
-            const mobile = document.getElementById('aoMobile').value.trim();
-
-            if (!mobile) {
-                alert('Please enter an operator mobile number.');
-                return;
-            }
-
-            fetch('?handler=AssignOperator', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': getToken()
-                },
-                body: JSON.stringify({ PumpId: pumpId, OperatorMobile: mobile })
-            })
-            .then(r => r.json())
-            .then(res => {
-                if (res.success) {
-                    bootstrap.Modal.getInstance(
-                        document.getElementById('assignOperatorModal')).hide();
-                    location.reload();
-                } else {
-                    alert('Failed to assign operator: ' + (res.message ?? 'Unknown error'));
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Error assigning operator.');
-            });
-        }
-    </script>
+    <script src="~/js/site.js"></script>
 }

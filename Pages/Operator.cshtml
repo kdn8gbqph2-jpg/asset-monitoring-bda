@@ -10,6 +10,9 @@
     @await Html.PartialAsync("Shared/_LoginHeader", Model)
     <!-- Pump Inventory Card -->
     @await Html.PartialAsync("Shared/_PumpInventory", Model.Pumps)
+
+    <!-- Pump Running Summary -->
+    @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
 </div>
 
 <!-- Pump Editor Drawer -->

@@ -13,6 +13,7 @@ namespace asset_monitoring.Pages
         private readonly ReportExportService  _reportExportService;
 
         public List<DashboardPumpDto> Pumps { get; private set; } = new();
+        public List<PumpRunningSummaryDto> RunningSummary { get; private set; } = new();
         public string? LoggedInUserName { get; private set; }
 
         public JuniorEngineerModel(
@@ -31,7 +32,7 @@ namespace asset_monitoring.Pages
                 return RedirectToPage("/Index");
             }
 
-            if (UserType != "BDA_OFFICIAL" && UserType != "ADMIN")
+            if (UserType != "JE" && UserType != "ADMIN")
             {
                 Logger.Warn("JuniorEngineer OnGetAsync: unauthorized access by userType={0}", UserType);
                 return RedirectToPage("/Index");
@@ -40,31 +41,39 @@ namespace asset_monitoring.Pages
             LoggedInUserName = Username;
             Logger.Info("JuniorEngineer OnGetAsync: user={0}", Username);
 
-            // ADMIN sees all pumps; BDA_OFFICIAL sees all pumps in read-only mode
+            // ADMIN sees all pumps; JE sees all pumps in read-only mode
             Pumps = await _pumpService.GetPumpsAsync(UserId, UserType == "ADMIN" ? "ADMIN" : "OPERATOR");
+            RunningSummary = await _pumpService.GetPumpRunningSummaryAsync(UserId, UserType);
 
             return Page();
         }
 
-        // ── Assign operator to a pump ──────────────────────────────────────
-        public async Task<JsonResult> OnPostAssignOperatorAsync([FromBody] AssignOperatorRequest req)
+        // ── Update pump details ────────────────────────────────────────────
+        public async Task<IActionResult> OnPostUpdatePumpAsync([FromBody] UpdatePumpRequest req)
         {
-            Logger.Info("JuniorEngineer OnPostAssignOperatorAsync: pumpId={0}, operator={1}",
-                req.PumpId, req.OperatorMobile);
+            Logger.Info("JuniorEngineer OnPostUpdatePumpAsync: pumpId={0} by user={1}", req.PumpId, Username);
 
-            if (!IsLoggedIn || (UserType != "BDA_OFFICIAL" && UserType != "ADMIN"))
+            if (!IsLoggedIn || (UserType != "JE" && UserType != "ADMIN"))
                 return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
 
             try
             {
-                var ok = await _pumpService.AssignOperatorAsync(req);
-                return new JsonResult(new { success = ok });
+                req.UpdatedBy = Username;
+                await _pumpService.UpdatePumpDetailsAsync(req);
+                Logger.Info("JuniorEngineer OnPostUpdatePumpAsync: pumpId={0} updated successfully", req.PumpId);
+                return new JsonResult(new { success = true });
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "JuniorEngineer OnPostAssignOperatorAsync failed");
-                return new JsonResult(new { success = false, message = "Server error" }) { StatusCode = 500 };
+                Logger.Error(ex, "JuniorEngineer OnPostUpdatePumpAsync failed for pumpId={0}", req.PumpId);
+                return new JsonResult(new { success = false, message = "Update failed" }) { StatusCode = 500 };
             }
+        }
+
+        public async Task<JsonResult> OnGetActiveUsersAsync()
+        {
+            var users = await _pumpService.GetActiveUsersForDrawerAsync();
+            return new JsonResult(users);
         }
 
         public IActionResult OnGetDownloadReport()

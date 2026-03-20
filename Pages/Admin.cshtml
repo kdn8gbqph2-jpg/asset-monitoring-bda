@@ -41,7 +41,7 @@
                         <td class="user-mobile">@user.MobileNumber</td>
                         <td>
                             <button type="button" class="btn btn-outline-primary btn-sm" title="Edit"
-                                    onclick="openEditUserDrawer('@user.UserId', '@user.Name', '@user.UserType', '@user.MobileNumber', '@user.Password', @user.IsActive)">
+                                    onclick="openEditUserDrawer('@user.UserId', '@user.Name', '@user.Username', '@user.UserType', '@user.MobileNumber', '@user.Password', @user.IsActive)">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button type="button" class="btn btn-outline-danger btn-sm" title="Delete"
@@ -58,6 +58,9 @@
 
     <!-- Pump Inventory Card -->
     @await Html.PartialAsync("Shared/_PumpInventory",Model.Pumps)
+
+    <!-- Pump Running Summary -->
+    @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
 </div>
 
 <!-- Pump Editor Drawer -->
@@ -82,11 +85,15 @@
                 <input type="text" class="form-control" id="editUserName" />
             </div>
             <div class="mb-3">
+                <label class="form-label">Username <span class="text-danger">*</span> <small class="text-muted">(used to login)</small></label>
+                <input type="text" class="form-control" id="editUserUsername" placeholder="e.g. admin_1, je_user" required />
+            </div>
+            <div class="mb-3">
                 <label class="form-label">Role</label>
                 <select class="form-select" id="editUserRole">
                     <option value="ADMIN">ADMIN</option>
                     <option value="OPERATOR">OPERATOR</option>
-                    <option value="BDA_OFFICIAL">BDA_OFFICIAL</option>
+                    <option value="JE">JE</option>
                 </select>
             </div>
             <div class="mb-3">
@@ -121,13 +128,14 @@
         return bootstrap.Offcanvas.getInstance(el) ?? new bootstrap.Offcanvas(el);
     }
 
-    function openEditUserDrawer(userId, name, role, mobile, password, isActive) {
-        document.getElementById('editUserId').value       = userId;
-        document.getElementById('editUserName').value     = name;
-        document.getElementById('editUserRole').value     = role;
-        document.getElementById('editUserMobile').value   = mobile;
-        document.getElementById('editUserPassword').value = ''; // never prefill password
-        document.getElementById('editUserActive').checked =
+    function openEditUserDrawer(userId, name, username, role, mobile, password, isActive) {
+        document.getElementById('editUserId').value        = userId;
+        document.getElementById('editUserName').value      = name;
+        document.getElementById('editUserUsername').value  = username ?? '';
+        document.getElementById('editUserRole').value      = role;
+        document.getElementById('editUserMobile').value    = mobile;
+        document.getElementById('editUserPassword').value  = ''; // never prefill password
+        document.getElementById('editUserActive').checked  =
             (isActive === true || isActive === 'True' || isActive === 'true');
 
         document.getElementById('userDrawerTitle').innerHTML =
@@ -139,12 +147,13 @@
     }
 
     function openAddUserDrawer() {
-        document.getElementById('editUserId').value       = '0';
-        document.getElementById('editUserName').value     = '';
-        document.getElementById('editUserRole').value     = 'OPERATOR';
-        document.getElementById('editUserMobile').value   = '';
-        document.getElementById('editUserPassword').value = '';
-        document.getElementById('editUserActive').checked = true;
+        document.getElementById('editUserId').value        = '0';
+        document.getElementById('editUserName').value      = '';
+        document.getElementById('editUserUsername').value  = '';
+        document.getElementById('editUserRole').value      = 'OPERATOR';
+        document.getElementById('editUserMobile').value    = '';
+        document.getElementById('editUserPassword').value  = '';
+        document.getElementById('editUserActive').checked  = true;
 
         document.getElementById('userDrawerTitle').innerHTML =
             '<i class="bi bi-person-plus"></i> Add User';
@@ -163,14 +172,15 @@
         const payload = {
             UserId:       userId,
             Name:         document.getElementById('editUserName').value.trim(),
+            Username:     document.getElementById('editUserUsername').value.trim(),
             UserType:     document.getElementById('editUserRole').value,
             MobileNumber: document.getElementById('editUserMobile').value.trim(),
             Password:     document.getElementById('editUserPassword').value,
             IsActive:     document.getElementById('editUserActive').checked
         };
 
-        if (!payload.Name || !payload.MobileNumber) {
-            alert('Name and Mobile Number are required.');
+        if (!payload.Name || !payload.MobileNumber || !payload.Username) {
+            alert('Name, Username and Mobile Number are required.');
             return;
         }
 

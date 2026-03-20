@@ -28,7 +28,7 @@ namespace asset_monitoring.Data.Configurations
             entity.Property(e => e.UserType)
                   .HasColumnName("user_type")
                   .HasConversion<string>()
-                  .HasColumnType("enum('ADMIN','OPERATOR','BDA_OFFICIAL')")
+                  .HasColumnType("enum('ADMIN','OPERATOR','JE')")
                   .IsUnicode(false);
 
             entity.Property(e => e.Password)

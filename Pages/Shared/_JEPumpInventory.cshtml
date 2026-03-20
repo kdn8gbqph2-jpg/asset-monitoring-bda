@@ -27,6 +27,7 @@
                     <th>VENDOR</th>
                     <th>LOCATION</th>
                     <th>OPERATOR</th>
+                    <th>JUNIOR ENGINEER</th>
                     <th>STATUS</th>
                     <th>ACTIONS</th>
                 </tr>
@@ -38,7 +39,42 @@
                         <td>@pump.PumpId</td>
                         <td>@pump.VendorName</td>
                         <td>@pump.Location</td>
-                        <td>@(pump.MobileNumber ?? "—")</td>
+
+                        <!-- Operator -->
+                        <td>
+                            @if (!string.IsNullOrEmpty(pump.OperatorName))
+                            {
+                                <span>@pump.OperatorName</span><br />
+                                <small class="text-muted">@pump.OperatorMobile</small>
+                            }
+                            else if (!string.IsNullOrEmpty(pump.OperatorMobile))
+                            {
+                                <small class="text-muted">@pump.OperatorMobile</small>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+
+                        <!-- Junior Engineer -->
+                        <td>
+                            @if (!string.IsNullOrEmpty(pump.JeName))
+                            {
+                                <span>@pump.JeName</span><br />
+                                <small class="text-muted">@pump.JeMobile</small>
+                            }
+                            else if (!string.IsNullOrEmpty(pump.JeMobile))
+                            {
+                                <small class="text-muted">@pump.JeMobile</small>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+
+                        <!-- Status -->
                         <td>
                             @if (pump.Status == "ON")
                             {
@@ -53,10 +89,20 @@
                                 <span class="badge-status-off">OFF</span>
                             }
                         </td>
-                        <td>
-                            <button class="btn btn-outline-secondary btn-sm"
-                                    onclick="openAssignOperator(@pump.PumpId, '@(pump.MobileNumber ?? "")')">
-                                <i class="bi bi-person-check"></i> Assign
+
+                        <!-- Actions -->
+                        <td class="text-nowrap">
+                            <button class="btn btn-primary btn-sm edit-pump-btn me-1"
+                                    data-pump-id="@pump.PumpId"
+                                    data-vendor="@pump.VendorName"
+                                    data-location="@pump.Location"
+                                    data-status="@pump.Status"
+                                    data-lat="@pump.Latitude"
+                                    data-lng="@pump.Longitude"
+                                    data-operator-mobile="@(pump.OperatorMobile ?? "")"
+                                    data-je-mobile="@(pump.JeMobile ?? "")"
+                                    title="Edit Pump">
+                                <i class="bi bi-pencil"></i>
                             </button>
                         </td>
                     </tr>

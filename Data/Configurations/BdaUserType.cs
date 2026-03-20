@@ -6,7 +6,7 @@ namespace asset_monitoring.Models
     {
         ADMIN,
         OPERATOR,
-        BDA_OFFICIAL
+        JE
     }
     public enum PumpStatus
     {

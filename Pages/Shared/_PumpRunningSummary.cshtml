@@ -1,0 +1,83 @@
+@model List<asset_monitoring.Services.PumpRunningSummaryDto>
+@{
+    string FormatRunTime(int minutes)
+    {
+        if (minutes <= 0) return "—";
+        var h = minutes / 60;
+        var m = minutes % 60;
+        return h > 0 ? $"{h}h {m}m" : $"{m}m";
+    }
+}
+
+<div class="card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-semibold text-primary m-0">
+            <i class="bi bi-bar-chart-line-fill icon-title"></i>
+            Pump Running Summary
+        </h5>
+        <span class="text-muted small">
+            <i class="bi bi-calendar-day me-1"></i>@DateTime.Now.ToString("dd MMM yyyy")
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dashboard align-middle">
+            <thead>
+                <tr>
+                    <th>PUMP ID</th>
+                    <th>VENDOR</th>
+                    <th>LOCATION</th>
+                    <th>STATUS</th>
+                    <th>TODAY</th>
+                    <th>THIS MONTH</th>
+                    <th>LAST UPDATED</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (Model == null || !Model.Any())
+            {
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-3">No data available</td>
+                </tr>
+            }
+            else
+            {
+                foreach (var item in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@item.PumpId</td>
+                        <td>@item.VendorName</td>
+                        <td>@item.Location</td>
+                        <td>
+                            @if (item.Status == "ON")
+                            {
+                                <span class="badge-status-on">ON</span>
+                            }
+                            else if (item.Status == "MAINTENANCE")
+                            {
+                                <span class="badge bg-warning text-dark fw-semibold px-2 py-1">MAINTENANCE</span>
+                            }
+                            else
+                            {
+                                <span class="badge-status-off">OFF</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="fw-semibold @(item.TodayRunMinutes > 0 ? "text-success" : "text-muted")">
+                                <i class="bi bi-clock me-1"></i>@FormatRunTime(item.TodayRunMinutes)
+                            </span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold @(item.MonthRunMinutes > 0 ? "text-primary" : "text-muted")">
+                                <i class="bi bi-calendar3 me-1"></i>@FormatRunTime(item.MonthRunMinutes)
+                            </span>
+                        </td>
+                        <td class="text-muted small">
+                            @item.LastUpdated.ToLocalTime().ToString("dd MMM, hh:mm tt")
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

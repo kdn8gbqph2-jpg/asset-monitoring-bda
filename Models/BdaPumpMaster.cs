@@ -10,6 +10,9 @@ namespace asset_monitoring.Models
 
         public string VendorName { get; set; } = null!;
 
+        [MaxLength(100)]
+        public string? UpdatedBy { get; set; }
+
         public string? Category { get; set; }
 
         public bool IsActive { get; set; } = true;

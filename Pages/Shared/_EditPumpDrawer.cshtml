@@ -1,4 +1,9 @@
-﻿<div class="offcanvas offcanvas-end" tabindex="-1" id="editPumpDrawer">
+@{
+    var _drawerUserType = Context.Session.GetString("UserType");
+    var _canAssign = _drawerUserType == "ADMIN" || _drawerUserType == "JE";
+}
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="editPumpDrawer">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="pumpDrawerTitle">
             <i class="bi bi-pencil-square"></i> Edit Pump
@@ -33,14 +38,27 @@
                     <option value="MAINTENANCE">MAINTENANCE</option>
                 </select>
             </div>
-@*             <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="editIsActive" checked>
-                <label class="form-check-label">Active</label>
-            </div> *@
+
+            @if (_canAssign)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Assign Operator</label>
+                    <select class="form-select" id="editOperatorMobile">
+                        <option value="">— Loading… —</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Assign Junior Engineer</label>
+                    <select class="form-select" id="editJeMobile">
+                        <option value="">— Loading… —</option>
+                    </select>
+                </div>
+            }
+
             <div class="mb-3">
                 <label class="form-label">Remarks</label>
                 <textarea class="form-control" id="editRemarks" rows="2"
-                          placeholder="Optional operator comment…"></textarea>
+                          placeholder="Optional comment…"></textarea>
             </div>
             <button type="button" id="pumpDrawerSaveBtn" class="btn btn-success w-100" onclick="savePump()">
                 <i class="bi bi-check-circle"></i> Save Changes
