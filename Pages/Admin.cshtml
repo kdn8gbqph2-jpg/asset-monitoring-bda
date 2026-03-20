@@ -47,7 +47,7 @@
                         <td class="user-mobile">@user.MobileNumber</td>
                         <td>
                             <button type="button" class="btn btn-outline-primary btn-sm" title="Edit"
-                                    onclick="openEditUserDrawer('@user.UserId', '@user.Name', '@user.Username', '@user.UserType', '@user.MobileNumber', '@user.Password', @user.IsActive)">
+                                    onclick="openEditUserDrawer(@user.UserId, @Html.Raw(Json.Serialize(user.Name)), @Html.Raw(Json.Serialize(user.Username ?? "")), @Html.Raw(Json.Serialize(user.UserType?.ToString() ?? "")), @Html.Raw(Json.Serialize(user.MobileNumber)), @user.IsActive.ToString().ToLower())">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button type="button" class="btn btn-outline-danger btn-sm" title="Delete"
@@ -134,15 +134,14 @@
         return bootstrap.Offcanvas.getInstance(el) ?? new bootstrap.Offcanvas(el);
     }
 
-    function openEditUserDrawer(userId, name, username, role, mobile, password, isActive) {
+    function openEditUserDrawer(userId, name, username, role, mobile, isActive) {
         document.getElementById('editUserId').value        = userId;
         document.getElementById('editUserName').value      = name;
         document.getElementById('editUserUsername').value  = username ?? '';
         document.getElementById('editUserRole').value      = role;
         document.getElementById('editUserMobile').value    = mobile;
         document.getElementById('editUserPassword').value  = ''; // never prefill password
-        document.getElementById('editUserActive').checked  =
-            (isActive === true || isActive === 'True' || isActive === 'true');
+        document.getElementById('editUserActive').checked  = (isActive === true);
 
         document.getElementById('userDrawerTitle').innerHTML =
             '<i class="bi bi-pencil-square"></i> Edit User';
