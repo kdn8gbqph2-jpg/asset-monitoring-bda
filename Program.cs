@@ -39,8 +39,11 @@ try
         options.IdleTimeout      = TimeSpan.FromMinutes(30);
         options.Cookie.HttpOnly  = true;
         options.Cookie.IsEssential = true;
-        // Mark the session cookie as Secure when running behind HTTPS proxy
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite    = SameSiteMode.Strict;
+        // Always require Secure cookie in production; allow HTTP in development
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
     });
 
     // Trust the X-Forwarded-* headers sent by Nginx
@@ -56,6 +59,20 @@ try
 
     // Must be first — reads X-Forwarded-Proto so HTTPS detection works correctly
     app.UseForwardedHeaders();
+
+    // ── Security headers ──────────────────────────────────────────────────
+    app.Use(async (ctx, next) =>
+    {
+        var h = ctx.Response.Headers;
+        h["X-Content-Type-Options"]  = "nosniff";
+        h["X-Frame-Options"]         = "SAMEORIGIN";
+        h["X-XSS-Protection"]        = "1; mode=block";
+        h["Referrer-Policy"]         = "strict-origin-when-cross-origin";
+        h["Permissions-Policy"]      = "geolocation=(), microphone=(), camera=()";
+        if (!ctx.Request.IsHttps) { /* HSTS only over HTTPS */ }
+        else h["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+        await next();
+    });
 
     if (!app.Environment.IsDevelopment())
     {

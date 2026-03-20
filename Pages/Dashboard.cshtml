@@ -601,20 +601,22 @@
                         return;
                     }
                     const tbody = document.getElementById('pdLogBody');
+                    const esc = s => (s == null || s === '') ? '—' : String(s)
+                        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                        .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
                     data.logs.forEach((l, i) => {
                         const fmt = dt => dt ? new Date(dt).toLocaleString('en-IN') : '—';
-                        const dur = l.durationMinutes != null
-                            ? `${l.durationMinutes} min` : '—';
+                        const dur = l.durationMinutes != null ? `${l.durationMinutes} min` : '—';
                         tbody.insertAdjacentHTML('beforeend', `
                             <tr>
-                                <td class="text-muted small">${l.logId}</td>
-                                <td>${l.oldStatus}</td>
-                                <td><strong>${l.newStatus}</strong></td>
+                                <td class="text-muted small">${esc(l.logId)}</td>
+                                <td>${esc(l.oldStatus)}</td>
+                                <td><strong>${esc(l.newStatus)}</strong></td>
                                 <td class="text-nowrap small">${fmt(l.startTime)}</td>
                                 <td class="text-nowrap small">${fmt(l.endTime)}</td>
-                                <td>${dur}</td>
-                                <td>${l.remarks ?? '—'}</td>
-                                <td>${l.updatedBy ?? '—'}</td>
+                                <td>${esc(dur)}</td>
+                                <td>${esc(l.remarks)}</td>
+                                <td>${esc(l.updatedBy)}</td>
                             </tr>`);
                     });
                     document.getElementById('pdLogTableWrap').classList.remove('d-none');

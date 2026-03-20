@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using NLog;
+using BCrypt.Net;
 
 namespace asset_monitoring.Pages
 {
@@ -134,6 +135,11 @@ namespace asset_monitoring.Pages
                 return new JsonResult(new { success = false, message = "Invalid input" });
             }
 
+            // Input length validation
+            if ((req.Name?.Length ?? 0) > 100 || (req.Username?.Length ?? 0) > 50 ||
+                (req.MobileNumber?.Length ?? 0) > 20)
+                return new JsonResult(new { success = false, message = "Input exceeds maximum length" });
+
             Logger.Info("OnPostUpdateUserAsync: userId={0}, userType={1} by admin={2}", req.UserId, req.UserType, Username);
 
             try
@@ -152,7 +158,7 @@ namespace asset_monitoring.Pages
                     user.UserType = parsedType;
                 user.MobileNumber = req.MobileNumber;
                 if (!string.IsNullOrWhiteSpace(req.Password))
-                    user.Password = req.Password; // Sprint 4: hash this
+                    user.Password = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 12);
                 user.IsActive = req.IsActive;
                 user.RowUpdationDateTime = DateTime.UtcNow;
 
@@ -180,6 +186,13 @@ namespace asset_monitoring.Pages
                 return new JsonResult(new { success = false, message = "Name, Username and Mobile are required" });
             }
 
+            // Input length validation
+            if (req.Name.Length > 100 || req.Username.Length > 50 || req.MobileNumber.Length > 20)
+                return new JsonResult(new { success = false, message = "Input exceeds maximum length" });
+
+            if (string.IsNullOrWhiteSpace(req.Password) || req.Password.Length < 6)
+                return new JsonResult(new { success = false, message = "Password must be at least 6 characters" });
+
             Logger.Info("OnPostAddUserAsync: name={0}, userType={1} by admin={2}", req.Name, req.UserType, Username);
 
             try
@@ -193,7 +206,7 @@ namespace asset_monitoring.Pages
                     Username = req.Username,
                     UserType = parsedType,
                     MobileNumber = req.MobileNumber,
-                    Password = req.Password, // Sprint 4: hash this
+                    Password = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 12),
                     IsActive = true,
                     RowInsertionDateTime = now,
                     RowUpdationDateTime = now

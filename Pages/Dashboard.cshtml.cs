@@ -4,25 +4,11 @@ using asset_monitoring.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration; 
-using MySqlConnector;
-using NLog; 
-using QuestPDF.Drawing;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
-using QuestPDF.Previewer;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using NLog;
 
 namespace asset_monitoring.Pages
 {
-    public class DashboardModel : PageModel
+    public class DashboardModel : AppPageModel
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger(); 
 
@@ -99,9 +85,50 @@ namespace asset_monitoring.Pages
         }
 
 
+        // ── Simple in-memory login rate limiter (IP → fail count + lockout expiry) ──
+        private static readonly Dictionary<string, (int Count, DateTime LockedUntil)> _loginAttempts
+            = new();
+        private static readonly object _loginLock = new();
+        private const int MaxLoginAttempts = 5;
+        private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+        private bool IsLoginRateLimited(string ip)
+        {
+            lock (_loginLock)
+            {
+                if (!_loginAttempts.TryGetValue(ip, out var entry)) return false;
+                if (entry.LockedUntil > DateTime.UtcNow) return true;
+                if (entry.Count >= MaxLoginAttempts)
+                {
+                    _loginAttempts[ip] = (entry.Count, DateTime.UtcNow.Add(LockoutDuration));
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        private void RecordFailedLogin(string ip)
+        {
+            lock (_loginLock)
+            {
+                _loginAttempts.TryGetValue(ip, out var entry);
+                var newCount = entry.Count + 1;
+                var lockUntil = newCount >= MaxLoginAttempts
+                    ? DateTime.UtcNow.Add(LockoutDuration)
+                    : DateTime.MinValue;
+                _loginAttempts[ip] = (newCount, lockUntil);
+            }
+        }
+
+        private void ClearLoginAttempts(string ip)
+        {
+            lock (_loginLock) { _loginAttempts.Remove(ip); }
+        }
+
         public async Task<IActionResult> OnPostLoginAsync()
         {
-            Logger.Info("Login attempt for user: {0}", LoginModel.Username);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            Logger.Info("Login attempt for user: {0} from IP: {1}", LoginModel.Username, ip);
 
             if (string.IsNullOrWhiteSpace(LoginModel.Username) ||
                 string.IsNullOrWhiteSpace(LoginModel.Password))
@@ -111,28 +138,39 @@ namespace asset_monitoring.Pages
                 return Page();
             }
 
-            // Lookup user from cache (key = mobile number)
+            if (IsLoginRateLimited(ip))
+            {
+                Logger.Warn("Login rate-limited for IP: {0}", ip);
+                LoginMessage = "Too many failed attempts. Please try again in 15 minutes.";
+                await OnGetAsync();
+                return Page();
+            }
+
             if (!_userCache.Users.TryGetValue(LoginModel.Username, out var user))
             {
-                Logger.Warn("Login failed (user not found): {0}", LoginModel.Username);
+                RecordFailedLogin(ip);
+                Logger.Warn("Login failed (user not found): {0} from IP: {1}", LoginModel.Username, ip);
                 LoginMessage = "Invalid username or password";
                 await OnGetAsync();
                 return Page();
             }
 
-          
-            if (user.Password != LoginModel.Password)
+            // Verify password — support BCrypt hashes and plain-text (auto-upgrades plain-text)
+            bool passwordValid = VerifyAndUpgradePassword(user, LoginModel.Password);
+            if (!passwordValid)
             {
-                Logger.Warn("Login failed (wrong password) for user: {0}", LoginModel.Username);
+                RecordFailedLogin(ip);
+                Logger.Warn("Login failed (wrong password) for user: {0} from IP: {1}", LoginModel.Username, ip);
                 LoginMessage = "Invalid username or password";
                 await OnGetAsync();
                 return Page();
             }
 
-      
+            ClearLoginAttempts(ip);
             Logger.Info("Login successful for user: {0}, role={1}", user.Name, user.UserType);
 
             LoginMessage = $"Welcome {user.Name} ({user.UserType})";
+            HttpContext.Session.Clear(); // prevent session fixation
             HttpContext.Session.SetInt32("UserId", user.UserId);
             HttpContext.Session.SetString("UserName", user.Name);
             HttpContext.Session.SetString("UserType", user.UserType);
@@ -202,23 +240,63 @@ namespace asset_monitoring.Pages
             }
         }
 
+        // ── Report downloads — require login ─────────────────────────────────
         public async Task<IActionResult> OnGetDownloadReportAsync()
         {
+            if (!IsLoggedIn) return RedirectToPage("/Index");
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsCsv(pumps);
         }
 
         public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
         {
+            if (!IsLoggedIn) return RedirectToPage("/Index");
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsXlsx(pumps);
         }
 
         public async Task<IActionResult> OnGetDownloadReportPdfAsync()
         {
+            if (!IsLoggedIn) return RedirectToPage("/Index");
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
+
+        // ── Password verification with BCrypt + plain-text migration ──────────
+        // Supports: BCrypt hashes (new), plain-text (legacy — auto-upgrades on login)
+        private bool VerifyAndUpgradePassword(ActiveUsers user, string plainPassword)
+        {
+            var stored = user.Password;
+            if (string.IsNullOrEmpty(stored)) return false;
+
+            // BCrypt hash starts with $2a$ or $2b$
+            if (stored.StartsWith("$2"))
+                return BCrypt.Net.BCrypt.Verify(plainPassword, stored);
+
+            // Legacy plain-text — verify then upgrade to hash in DB
+            if (stored != plainPassword) return false;
+
+            // Upgrade: hash and save to DB
+            try
+            {
+                using var scope = HttpContext.RequestServices.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<asset_monitoring.Data.ApplicationDbContext>();
+                var dbUser = db.BdaUserMasters.Find(user.UserId);
+                if (dbUser != null)
+                {
+                    dbUser.Password = BCrypt.Net.BCrypt.HashPassword(plainPassword, workFactor: 12);
+                    db.SaveChanges();
+                    Logger.Info("VerifyAndUpgradePassword: upgraded password hash for userId={0}", user.UserId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "VerifyAndUpgradePassword: failed to upgrade hash for userId={0}", user.UserId);
+            }
+
+            return true;
+        }
+
         public class LoginInputModel
         {
             public string Username { get; set; } = "";
