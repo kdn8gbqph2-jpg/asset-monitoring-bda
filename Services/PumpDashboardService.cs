@@ -70,6 +70,13 @@ namespace asset_monitoring.Services
             _cache = cache;
         }
 
+        // ── Force-invalidate the ADMIN pump cache ─────────────────────────────
+        public void InvalidateCache()
+        {
+            _cache.Remove(ADMIN_CACHE_KEY);
+            Logger.Info("InvalidateCache: ADMIN pump cache cleared");
+        }
+
         // ── Public query entry-point ──────────────────────────────────────────
         public async Task<List<DashboardPumpDto>> GetPumpsAsync(
             int? userId = null,

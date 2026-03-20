@@ -9,6 +9,12 @@
 
 <div class="container">
 @await Html.PartialAsync("Shared/_LoginHeader", Model)
+    <!-- Refresh Data -->
+    <div class="d-flex justify-content-end mb-3">
+        <a href="?handler=RefreshData" class="btn btn-outline-secondary btn-sm" title="Clear cache and reload fresh data from database">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh Data
+        </a>
+    </div>
     <!-- User Management Card -->
     <div class="card mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3">

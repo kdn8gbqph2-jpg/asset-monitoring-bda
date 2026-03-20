@@ -269,6 +269,16 @@ namespace asset_monitoring.Pages
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
 
+        public IActionResult OnGetRefreshData()
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return RedirectToPage("/Index");
+
+            _pumpDashboardService.InvalidateCache();
+            Logger.Info("OnGetRefreshData: cache cleared by admin={0}", Username);
+            return RedirectToPage();
+        }
+
         public IActionResult OnPostLogout()
         {
             Logger.Info("OnPostLogout: admin={0} logged out", Username);
