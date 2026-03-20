@@ -40,25 +40,25 @@
         <div class="col-6 col-md-3">
             <div class="kpi-card kpi-blue">
                 <div class="kpi-title">Total Pumps</div>
-                <div class="kpi-value">@Model.TotalPumps</div>
+                <div class="kpi-value" id="kpiTotal">@Model.TotalPumps</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="kpi-card kpi-green">
                 <div class="kpi-title">Running</div>
-                <div class="kpi-value">@Model.RunningPumpCount</div>
+                <div class="kpi-value" id="kpiRunning">@Model.RunningPumpCount</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="kpi-card kpi-red">
                 <div class="kpi-title">Offline</div>
-                <div class="kpi-value">@Model.OfflinePumpCount</div>
+                <div class="kpi-value" id="kpiOffline">@Model.OfflinePumpCount</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="kpi-card kpi-yellow">
                 <div class="kpi-title">Maintenance</div>
-                <div class="kpi-value">@Model.MaintenancePumpCount</div>
+                <div class="kpi-value" id="kpiMaint">@Model.MaintenancePumpCount</div>
             </div>
         </div>
     </div>
@@ -110,7 +110,7 @@
                     <tbody>
                         @foreach (var p in Model.Pumps)
                         {
-                            <tr>
+                            <tr data-pump-id="@p.PumpId">
                                 <td>
                                     <button class="btn btn-link p-0 fw-semibold"
                                             onclick="openPumpDetail('@p.PumpId', '@(p.VendorName ?? "")', '@(p.Location ?? "")', '@(p.Status ?? "OFF")')">
@@ -286,35 +286,71 @@
             loadPumpMarkers();
         }
 
+        // ── Helpers for live DOM patching ───────────────────────────────────
+        function statusHtml(status) {
+            if (status === 'ON')
+                return '<span class="status-dot dot-on">●</span><span class="badge-status-on">ON</span>';
+            if (status === 'OFF')
+                return '<span class="status-dot dot-off">●</span><span class="badge-status-off">OFF</span>';
+            return '<span class="status-dot dot-maint">●</span><span class="badge bg-warning text-dark">MAINTENANCE</span>';
+        }
+
+        function runningHtml(minutes) {
+            if (!minutes || minutes <= 0) return '<span class="text-muted">—</span>';
+            const h = Math.floor(minutes / 60), m = minutes % 60;
+            return h > 0
+                ? `<span class="text-success fw-semibold">${h} h ${m} m</span>`
+                : `<span class="text-success fw-semibold">${m} m</span>`;
+        }
+
         function loadPumpMarkers() {
             fetch('?handler=Refresh')
                 .then(r => r.json())
                 .then(data => {
+                    // ── Update KPI cards ────────────────────────────────────
+                    document.getElementById('kpiTotal').textContent   = data.totalPumps;
+                    document.getElementById('kpiRunning').textContent = data.runningNow;
+                    document.getElementById('kpiOffline').textContent = data.offlineCount;
+                    document.getElementById('kpiMaint').textContent   = data.maintenanceCount;
+
+                    // ── Rebuild map markers ─────────────────────────────────
                     markersLayer.clearLayers();
 
                     data.pumps.forEach(p => {
                         // Row flash on status change
                         if (prevStatuses[p.pumpId] !== undefined && prevStatuses[p.pumpId] !== p.status) {
-                            const rows = document.querySelectorAll('.table-dashboard tbody tr');
-                            rows.forEach(tr => {
-                                if (tr.cells[0] && tr.cells[0].textContent.trim() === String(p.pumpId)) {
-                                    tr.classList.remove('row-flash');
-                                    void tr.offsetWidth; // force reflow
-                                    tr.classList.add('row-flash');
-                                    setTimeout(() => tr.classList.remove('row-flash'), 2000);
-                                }
-                            });
+                            const row = document.querySelector(
+                                `.table-dashboard tbody tr[data-pump-id="${p.pumpId}"]`);
+                            if (row) {
+                                row.classList.remove('row-flash');
+                                void row.offsetWidth; // force reflow
+                                row.classList.add('row-flash');
+                                setTimeout(() => row.classList.remove('row-flash'), 2000);
+                            }
                         }
                         prevStatuses[p.pumpId] = p.status;
 
-                        if (p.latitude && p.longitude) {
-                            addPumpMarker(p);
+                        // ── Patch table row (running hours + status) ────────
+                        const row = document.querySelector(
+                            `.table-dashboard tbody tr[data-pump-id="${p.pumpId}"]`);
+                        if (row) {
+                            row.cells[7].innerHTML = runningHtml(p.runningMinutes);
+                            row.cells[8].innerHTML = statusHtml(p.status);
+                            // Keep openPumpDetail onclick in sync
+                            const btn = row.cells[0].querySelector('button');
+                            if (btn) {
+                                const v = (s) => (s || '').replace(/'/g, "\\'");
+                                btn.setAttribute('onclick',
+                                    `openPumpDetail('${p.pumpId}','${v(p.vendorName)}','${v(p.location)}','${p.status}')`);
+                            }
                         }
+
+                        if (p.latitude && p.longitude) addPumpMarker(p);
                     });
 
                     lastRefreshTime = Date.now();
                 })
-                .catch(err => console.error("Map data load failed", err));
+                .catch(err => console.error("Live refresh failed", err));
         }
 
         function addPumpMarker(pump) {
@@ -351,8 +387,8 @@
             });
         }
 
-        // Auto-refresh every 30s
-        setInterval(loadPumpMarkers, 30000);
+        // Auto-refresh every 10s — updates table rows, KPI cards and map markers live
+        setInterval(loadPumpMarkers, 10000);
 
         // Live "last updated" label — updates every 15s
         setInterval(function () {
