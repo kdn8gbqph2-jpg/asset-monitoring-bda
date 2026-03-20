@@ -76,6 +76,12 @@ namespace asset_monitoring.Pages
             return new JsonResult(users);
         }
 
+        public IActionResult OnPostLogout()
+        {
+            Logger.Info("JuniorEngineer OnPostLogout: user={0} logged out", Username);
+            return LogoutAndRedirect();
+        }
+
         public IActionResult OnGetDownloadReport()
         {
             var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
