@@ -18,7 +18,7 @@ namespace asset_monitoring.Data.Configurations
 
             entity.Property(e => e.Status)
                   .HasColumnName("status")
-                  .HasConversion<string>()
+                  .HasConversion(PumpStatusConverter.Instance)
                   .HasColumnType("enum('ON','OFF','MAINTENANCE')")
                   .IsRequired();
 
@@ -38,6 +38,10 @@ namespace asset_monitoring.Data.Configurations
             entity.Property(e => e.UpdatedBy)
                   .HasColumnName("updated_by")
                   .HasMaxLength(100);
+
+            entity.Property(e => e.JeMobile)
+                  .HasColumnName("je_mobile")
+                  .HasMaxLength(15);
 
             entity.Property(e => e.RowActionCount)
                   .HasColumnName("row_action_count")

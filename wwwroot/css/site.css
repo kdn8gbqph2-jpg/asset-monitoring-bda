@@ -63,39 +63,155 @@ html {
     margin-bottom: 1.5rem;
 }
 
+/* ── Dark navbar ─────────────────────────────────────────────────────── */
+.dash-navbar {
+    background: #0f172a;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.dash-navbar .nav-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.dash-navbar .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+.dash-navbar .btn-nav {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 8px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dash-navbar .btn-nav:hover { background: rgba(255,255,255,0.2); }
+
+.dash-navbar .btn-nav-primary {
+    background: #2563EB;
+    border-color: #2563EB;
+}
+
+.dash-navbar .btn-nav-primary:hover { background: #1d4ed8; }
+
 /* KPI */
 .kpi-card {
-    background: var(--card-bg);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
     box-shadow: 0 1px 8px rgba(0,0,0,0.06);
-    padding: 1.5rem;
+    background: #fff;
+    border-left: 4px solid var(--kpi-color, #2563EB);
 }
 
 .kpi-title {
-    color: var(--primary-color);
+    font-size: 0.85rem;
     font-weight: 600;
-    font-size: 1.1rem;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .kpi-value {
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 700;
     color: var(--text-primary);
+    line-height: 1.2;
 }
 
+.kpi-card.kpi-blue  { --kpi-color: #2563EB; }
+.kpi-card.kpi-green { --kpi-color: #16A34A; }
+.kpi-card.kpi-red   { --kpi-color: #DC2626; }
+.kpi-card.kpi-yellow{ --kpi-color: #F59E0B; }
+
 /* Table */
+.table-dashboard {
+    border-collapse: collapse;
+    table-layout: auto;
+    width: 100%;
+}
+
 .table-dashboard th {
-    background: var(--table-header-bg);
-    color: var(--table-header-color);
-    border: none;
+    background-color: var(--table-header-bg) !important;
+    --bs-table-bg: var(--table-header-bg);
+    color: var(--table-header-color) !important;
     font-weight: 700;
+    border: 1px solid #1d4ed8;
+    white-space: nowrap;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2;
 }
 
 .table-dashboard td {
-    border: none;
+    border: 1px solid #dee2e6;
     font-size: 1.05rem;
     vertical-align: middle;
 }
+
+.table-dashboard tbody tr:hover {
+    background-color: #f0f6ff;
+}
+
+/* ── Sticky Status column (always visible on the right while scrolling) ──
+   Uses an explicit class rather than :last-child so sticky stacking is
+   unambiguous regardless of table/overflow-container nesting.           ── */
+.table-dashboard th.col-sticky-right {
+    position: sticky !important;
+    top: 0 !important;                                 /* freeze to top too */
+    right: 0;
+    z-index: 4;                                        /* above all other headers */
+    background-color: var(--table-header-bg) !important;
+    box-shadow: -3px 0 6px rgba(0,0,0,0.18);
+}
+
+.table-dashboard td.col-sticky-right {
+    position: sticky !important;
+    right: 0;
+    z-index: 2;
+    background-color: #ffffff !important;              /* must be opaque */
+    box-shadow: -3px 0 6px rgba(0,0,0,0.10);
+}
+
+.table-dashboard tbody tr:hover td.col-sticky-right {
+    background-color: #f0f6ff !important;              /* keep hover tint */
+}
+
+/* Sortable column headers */
+.table-dashboard th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.table-dashboard th.sortable:hover {
+    background-color: #1d4ed8 !important;
+}
+
+.table-dashboard th.sort-asc,
+.table-dashboard th.sort-desc {
+    background-color: #1e40af !important;
+}
+
+.sort-icon {
+    font-size: 0.75rem;
+    opacity: 0.55;
+    margin-left: 4px;
+    pointer-events: none;
+}
+
+.table-dashboard th.sort-asc .sort-icon,
+.table-dashboard th.sort-desc .sort-icon {
+    opacity: 1;
+}
+
 
 /* Status badges */
 .badge-status-on {
@@ -137,62 +253,67 @@ html {
 }
 
 /* =========================================================
-   DASHBOARD HEIGHT FIX (IMPORTANT PART)
+   DASHBOARD PANEL HEIGHTS — map and table always match
    ========================================================= */
 
-/* Fixed dashboard height */
+/* Row is already a Bootstrap flex container; lock it to a fixed height
+   and force both child columns to stretch to the same edge. */
 #dashboardRow {
-    min-height: 420px;
-    max-height: 420px;
+    height: 420px;
+    align-items: stretch;   /* both cols grow to the same height */
 }
 
-/* Keep both columns same height */
+/* Columns must fill the row height */
 #mapCol,
 #tableCol {
-    height: 100%;
-}
-
-    /* Map card fixed */
-    #mapCol .card {
-        height: 100%;
-    }
-
-/* Map itself */
-#map {
-    height: 100%;
-    min-height: 360px;
-}
-
-/* TABLE SCROLL (this fixes expansion issue) */
-#tableCol .card {
     height: 100%;
     display: flex;
     flex-direction: column;
 }
 
-#tableCol table {
-    flex: 1;
+/* Cards inside each column fill the column exactly —
+   override the global .card margin-bottom so nothing is cut short */
+#mapCol .card,
+#tableCol .card {
+    flex: 1 1 0;
+    height: 100%;
+    min-height: 0;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
 }
 
-#tableCol tbody {
-    display: block;
-    max-height: 300px; /* controls scroll height */
+/* Map div fills its card */
+#map {
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+}
+
+/* Table-responsive scrolls inside the card; grows to fill remaining space
+   after the "Report Issue" button row.
+   overflow-x + overflow-y set separately so sticky-right has a clear
+   single-axis horizontal scroll container. */
+#tableCol .table-responsive {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: auto;
     overflow-y: auto;
 }
 
-    #tableCol thead,
-    #tableCol tbody tr {
-        display: table;
-        width: 100%;
-        table-layout: fixed;
-    }
+/* Expand map mode */
+#dashboardRow.expand-map #map {
+    height: calc(100vh - 280px);
+    min-height: 400px;
+}
 
 /* =========================================================
    EXPANDED MAP / LIST MODES
    ========================================================= */
 
 .expand-map #mapCol {
-    flex: 0 0 100%;
+    flex: 0 0 100% !important;
+    width: 100% !important;
     max-width: 100%;
 }
 
@@ -201,7 +322,8 @@ html {
 }
 
 .expand-list #tableCol {
-    flex: 0 0 100%;
+    flex: 0 0 100% !important;
+    width: 100% !important;
     max-width: 100%;
 }
 
@@ -212,14 +334,13 @@ html {
 /* Expanded height uses viewport */
 #dashboardRow.expand-map,
 #dashboardRow.expand-list {
-    min-height: calc(100vh - 220px);
-    max-height: calc(100vh - 220px);
+    height: calc(100vh - 200px);
+    min-height: 500px;
 }
 
-    #dashboardRow.expand-map .card,
-    #dashboardRow.expand-list .card {
-        height: 100%;
-    }
+#dashboardRow.expand-list #tableCol .table-responsive {
+    max-height: none;   /* let flex handle it in expanded mode */
+}
 
 /* Active view button */
 .view-btn.active {
@@ -227,8 +348,22 @@ html {
     color: #fff;
     border-color: #0d6efd;
 }
+
+/* Reset button — subtle pulse on hover to hint it does something */
+#btnReset {
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+#btnReset:hover {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+    transform: scale(1.06);
+}
+
+#btnReset:active {
+    transform: scale(0.96);
+}
 .dashboard-title {
-    font-size: 1.75rem; 
+    font-size: 1.75rem;
 }
 
 @media (max-width: 768px) {
@@ -236,3 +371,32 @@ html {
         font-size: 1.4rem;
     }
 }
+
+/* ── Status dots ─────────────────────────────────────────────────────── */
+.status-dot { font-size: 0.6rem; margin-right: 4px; vertical-align: middle; }
+.dot-on   { color: #16A34A; }
+.dot-off  { color: #DC2626; }
+.dot-maint{ color: #F59E0B; }
+
+/* ── Row flash animation (status change) ─────────────────────────────── */
+@keyframes rowFlash {
+    0%   { background-color: #fef9c3; }
+    50%  { background-color: #fde68a; }
+    100% { background-color: transparent; }
+}
+
+.row-flash {
+    animation: rowFlash 2s ease-out forwards;
+}
+
+/* ── Column resize handle ────────────────────────────────────────────── */
+.col-resizer {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 10;
+}
+
+.col-resizer:hover { background: rgba(255,255,255,0.4); }

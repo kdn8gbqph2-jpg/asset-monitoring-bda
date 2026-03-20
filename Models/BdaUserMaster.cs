@@ -11,6 +11,9 @@ namespace asset_monitoring.Models
         [MaxLength(100)]
         public string? Name { get; set; }
 
+        [MaxLength(50)]
+        public string? Username { get; set; }
+
         // Stored as enum string in DB; configured in EF mapping
         public BdaUserType? UserType { get; set; }
 

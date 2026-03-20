@@ -33,6 +33,8 @@ namespace asset_monitoring.Pages
         private readonly ReportExportService _reportExportService;
         public int TotalPumps { get; private set; }
         public int RunningPumpCount { get; private set; }
+        public int OfflinePumpCount { get; private set; }
+        public int MaintenancePumpCount { get; private set; }
         public string AvgRuntime { get; private set; } = "0 hrs";
 
         public List<PumpRow> Pumps { get; private set; } = new();
@@ -74,14 +76,20 @@ namespace asset_monitoring.Pages
                 Location = p.Location,
                 Latitude = p.Latitude,
                 Longitude = p.Longitude,
-                Status = p.Status,
-                LastUpdated = p.LastUpdated,
-                LastRun = null,
-                MobileNumber = p.MobileNumber // <-- Add this line
+                Status         = p.Status,
+                RunningMinutes = p.RunningMinutes,
+                LastUpdated    = p.LastUpdated,
+                LastRun        = null,
+                OperatorName   = p.OperatorName,
+                OperatorMobile = p.OperatorMobile,
+                JeName         = p.JeName,
+                JeMobile       = p.JeMobile
             }).ToList();
 
             TotalPumps = Pumps.Count;
             RunningPumpCount = pumpData.Count(p => p.Status == "ON");
+            OfflinePumpCount = pumpData.Count(p => p.Status == "OFF");
+            MaintenancePumpCount = pumpData.Count(p => p.Status == "MAINTENANCE");
 
             double totalRunningMinutes = pumpData.Sum(p => p.RunningMinutes);
             AvgRuntime = TotalPumps > 0
@@ -138,6 +146,10 @@ namespace asset_monitoring.Pages
             {
                 return RedirectToPage("/Operator");
             }
+            else if (user.UserType == "BDA_OFFICIAL")
+            {
+                return RedirectToPage("/JuniorEngineer");
+            }
 
             await OnGetAsync();
             return Page();
@@ -152,6 +164,8 @@ namespace asset_monitoring.Pages
             {
                 totalPumps = TotalPumps,
                 runningNow = RunningPumpCount,
+                offlineCount = OfflinePumpCount,
+                maintenanceCount = MaintenancePumpCount,
                 avgRuntime = AvgRuntime,
                 pumps = Pumps
             });
@@ -164,15 +178,45 @@ namespace asset_monitoring.Pages
             public decimal? Latitude { get; init; }
             public decimal? Longitude { get; init; }
             public string? Status { get; init; }
+            public int RunningMinutes { get; init; }
             public DateTime LastUpdated { get; init; }
             public DateTime? LastRun { get; init; }
-            public string? MobileNumber { get; init; } // <-- Add this line
+            public string? OperatorName { get; init; }
+            public string? OperatorMobile { get; init; }
+            public string? JeName { get; init; }
+            public string? JeMobile { get; init; }
         }
+        public async Task<JsonResult> OnGetPumpLogsAsync(int pumpId)
+        {
+            Logger.Info("OnGetPumpLogsAsync: pumpId={0}", pumpId);
+            try
+            {
+                var logs = await _PumpdashboardService.GetPumpLogsAsync(pumpId);
+                return new JsonResult(new { success = true, logs });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnGetPumpLogsAsync failed for pumpId={0}", pumpId);
+                return new JsonResult(new { success = false, message = "Failed to load logs" });
+            }
+        }
+
         public IActionResult OnGetDownloadReport()
         {
+            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsCsv(pumps);
+        }
 
-            var allActivePumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
-            return _reportExportService.ExportPumpsAsCsv(allActivePumps);
+        public IActionResult OnGetDownloadReportXlsx()
+        {
+            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsXlsx(pumps);
+        }
+
+        public IActionResult OnGetDownloadReportPdf()
+        {
+            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsPdf(pumps);
         }
         public class LoginInputModel
         {

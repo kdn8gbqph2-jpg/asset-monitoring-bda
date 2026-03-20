@@ -1,4 +1,7 @@
 ﻿@model IEnumerable<asset_monitoring.Services.DashboardPumpDto>
+@{
+    var isAdmin = Context.Session.GetString("UserType") == "ADMIN";
+}
 
 <div class="card mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -8,15 +11,24 @@
         </h5>
 
         <div>
-            <button type="button"
-                    class="btn btn-outline-primary btn-sm me-2"
-                    onclick="window.location.href='?handler=DownloadReport'">
-                <i class="bi bi-file-earmark-excel"></i> Download Report
-            </button>
+            <div class="btn-group me-2">
+                <a href="?handler=DownloadReportXlsx" class="btn btn-outline-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i> Excel
+                </a>
+                <a href="?handler=DownloadReportPdf" class="btn btn-outline-danger btn-sm" title="Download PDF">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                </a>
+                <a href="?handler=DownloadReport" class="btn btn-outline-secondary btn-sm" title="Download CSV">
+                    <i class="bi bi-file-earmark-text"></i> CSV
+                </a>
+            </div>
 
-            <button type="button" class="btn btn-primary btn-sm admin-add-btn">
-                <i class="bi bi-plus-lg"></i> Add Pump
-            </button>
+            @if (isAdmin)
+            {
+                <button type="button" class="btn btn-primary btn-sm" onclick="openAddPumpDrawer()">
+                    <i class="bi bi-plus-lg"></i> Add Pump
+                </button>
+            }
         </div>
     </div>
 
@@ -27,7 +39,7 @@
                     <th>PUMP ID</th>
                     <th>VENDOR</th>
                     <th>LOCATION</th>
-                    <th>MOBILE</th>
+                    <th>OPERATOR</th>
                     <th>STATUS</th>
                     <th>ACTIONS</th>
                 </tr>
@@ -39,7 +51,17 @@
                         <td>@pump.PumpId</td>
                         <td>@pump.VendorName</td>
                         <td>@pump.Location</td>
-                        <td>@pump.MobileNumber</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(pump.OperatorName))
+                            {
+                                <span>@pump.OperatorName</span><br />
+                                <small class="text-muted">@pump.OperatorMobile</small>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@pump.OperatorMobile</span>
+                            }
+                        </td>
                         <td>
                             @if (pump.Status == "ON")
                             {
@@ -51,29 +73,32 @@
                             }
                         </td>
                         <td>
-                            <button class="btn btn-primary btn-sm"
-                                    onclick="openEditPumpDrawer(
-                                        @pump.PumpId,
-                                        '@pump.VendorName',
-                                        '@pump.Location',
-                                        '@pump.Status',
-                                        @pump.Latitude,
-                                        @pump.Longitude,
-                                        true
-                                    )">
+                            @* Use data-* attrs — avoids null/apostrophe injection in inline onclick *@
+                            <button class="btn btn-primary btn-sm edit-pump-btn"
+                                    data-pump-id="@pump.PumpId"
+                                    data-vendor="@pump.VendorName"
+                                    data-location="@pump.Location"
+                                    data-status="@pump.Status"
+                                    data-lat="@pump.Latitude"
+                                    data-lng="@pump.Longitude"
+                                    title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </button>
 
-                            <form method="post"
-                                  asp-page-handler="DeletePump"
-                                  asp-route-id="@pump.PumpId"
-                                  class="d-inline"
-                                  onsubmit="return confirm('Delete this pump?');">
-                                <button type="submit"
-                                        class="btn btn-outline-danger btn-sm">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
+                            @if (isAdmin)
+                            {
+                                <form method="post"
+                                      asp-page-handler="DeletePump"
+                                      asp-route-id="@pump.PumpId"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Delete this pump?');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit"
+                                            class="btn btn-outline-danger btn-sm">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            }
                         </td>
                     </tr>
                 }
