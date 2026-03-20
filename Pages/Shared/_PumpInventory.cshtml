@@ -1,6 +1,8 @@
-﻿@model IEnumerable<asset_monitoring.Services.DashboardPumpDto>
+@model IEnumerable<asset_monitoring.Services.DashboardPumpDto>
 @{
-    var isAdmin = Context.Session.GetString("UserType") == "ADMIN";
+    var userType = Context.Session.GetString("UserType");
+    var isAdmin  = userType == "ADMIN";
+    var isJE     = userType == "JE";
 }
 
 <div class="card mb-4">
@@ -40,6 +42,7 @@
                     <th>VENDOR</th>
                     <th>LOCATION</th>
                     <th>OPERATOR</th>
+                    <th>JUNIOR ENGINEER</th>
                     <th>STATUS</th>
                     <th>ACTIONS</th>
                 </tr>
@@ -51,40 +54,77 @@
                         <td>@pump.PumpId</td>
                         <td>@pump.VendorName</td>
                         <td>@pump.Location</td>
+
+                        <!-- Operator -->
                         <td>
                             @if (!string.IsNullOrEmpty(pump.OperatorName))
                             {
                                 <span>@pump.OperatorName</span><br />
                                 <small class="text-muted">@pump.OperatorMobile</small>
                             }
+                            else if (!string.IsNullOrEmpty(pump.OperatorMobile))
+                            {
+                                <small class="text-muted">@pump.OperatorMobile</small>
+                            }
                             else
                             {
-                                <span class="text-muted">@pump.OperatorMobile</span>
+                                <span class="text-muted">—</span>
                             }
                         </td>
+
+                        <!-- Junior Engineer -->
+                        <td>
+                            @if (!string.IsNullOrEmpty(pump.JeName))
+                            {
+                                <span>@pump.JeName</span><br />
+                                <small class="text-muted">@pump.JeMobile</small>
+                            }
+                            else if (!string.IsNullOrEmpty(pump.JeMobile))
+                            {
+                                <small class="text-muted">@pump.JeMobile</small>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+
+                        <!-- Status -->
                         <td>
                             @if (pump.Status == "ON")
                             {
                                 <span class="badge-status-on">ON</span>
+                            }
+                            else if (pump.Status == "MAINTENANCE")
+                            {
+                                <span class="badge bg-warning text-dark">MAINTENANCE</span>
                             }
                             else
                             {
                                 <span class="badge-status-off">@pump.Status</span>
                             }
                         </td>
-                        <td>
-                            @* Use data-* attrs — avoids null/apostrophe injection in inline onclick *@
-                            <button class="btn btn-primary btn-sm edit-pump-btn"
-                                    data-pump-id="@pump.PumpId"
-                                    data-vendor="@pump.VendorName"
-                                    data-location="@pump.Location"
-                                    data-status="@pump.Status"
-                                    data-lat="@pump.Latitude"
-                                    data-lng="@pump.Longitude"
-                                    title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </button>
 
+                        <!-- Actions -->
+                        <td class="text-nowrap">
+                            @* Edit pump — Admin and JE *@
+                            @if (isAdmin || isJE)
+                            {
+                                <button class="btn btn-primary btn-sm edit-pump-btn me-1"
+                                        data-pump-id="@pump.PumpId"
+                                        data-vendor="@pump.VendorName"
+                                        data-location="@pump.Location"
+                                        data-status="@pump.Status"
+                                        data-lat="@pump.Latitude"
+                                        data-lng="@pump.Longitude"
+                                        data-operator-mobile="@(pump.OperatorMobile ?? "")"
+                                        data-je-mobile="@(pump.JeMobile ?? "")"
+                                        title="Edit Pump">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            }
+
+                            @* Delete — Admin only *@
                             @if (isAdmin)
                             {
                                 <form method="post"
@@ -93,8 +133,7 @@
                                       class="d-inline"
                                       onsubmit="return confirm('Delete this pump?');">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-sm">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Pump">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>

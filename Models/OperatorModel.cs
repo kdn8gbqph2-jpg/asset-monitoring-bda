@@ -19,21 +19,39 @@ namespace asset_monitoring.Pages
             _reportExportService = reportExportService;
         }
         public List<DashboardPumpDto> Pumps { get; set; } = new();
+        public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
 
         public async Task<IActionResult> OnGetAsync()
         {
+            if (!IsLoggedIn)
+            {
+                Logger.Warn("OnGetAsync: unauthenticated access attempt to operator page");
+                return RedirectToPage("/Index");
+            }
+
+            if (UserType != "OPERATOR" && UserType != "ADMIN")
+            {
+                Logger.Warn("OnGetAsync: unauthorized access attempt to operator page by userType={0}", UserType);
+                return RedirectToPage("/Index");
+            }
+
             LoggedInUserName = Username;
             Logger.Info("OnGetAsync: operator page loaded for userId={0}, user={1}", UserId, Username);
             Pumps = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
+            RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync(UserId, UserType);
             Logger.Debug("OnGetAsync: loaded {0} pumps for operator userId={1}", Pumps.Count, UserId);
             return Page();
         }
 
         public async Task<IActionResult> OnPostUpdatePumpAsync([FromBody] UpdatePumpRequest req)
         {
+            if (!IsLoggedIn || (UserType != "OPERATOR" && UserType != "ADMIN"))
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             Logger.Info("OnPostUpdatePumpAsync: pumpId={0} by operator userId={1}", req.PumpId, UserId);
             try
             {
+                req.UpdatedBy = Username;
                 await _pumpDashboardService.UpdatePumpDetailsAsync(req);
                 Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", req.PumpId);
                 return new JsonResult(new { success = true });
@@ -53,9 +71,18 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
+            if (!IsLoggedIn || (UserType != "OPERATOR" && UserType != "ADMIN"))
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by operator userId={1}", id, UserId);
             await _pumpDashboardService.DeletePumpAsync(id);
             return RedirectToPage();
+        }
+
+        public async Task<JsonResult> OnGetActiveUsersAsync()
+        {
+            var users = await _pumpDashboardService.GetActiveUsersForDrawerAsync();
+            return new JsonResult(users);
         }
 
         public IActionResult OnGetDownloadReport()

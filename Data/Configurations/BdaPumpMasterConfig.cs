@@ -21,6 +21,10 @@ namespace asset_monitoring.Data.Configurations
                   .HasMaxLength(100)
                   .IsRequired();
 
+            entity.Property(e => e.UpdatedBy)
+                  .HasColumnName("updated_by")
+                  .HasMaxLength(100);
+
             entity.Property(e => e.Category)
                   .HasColumnName("category")
                   .HasMaxLength(50);

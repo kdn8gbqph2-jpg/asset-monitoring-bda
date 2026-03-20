@@ -146,7 +146,7 @@ namespace asset_monitoring.Pages
             {
                 return RedirectToPage("/Operator");
             }
-            else if (user.UserType == "BDA_OFFICIAL")
+            else if (user.UserType == "JE")
             {
                 return RedirectToPage("/JuniorEngineer");
             }

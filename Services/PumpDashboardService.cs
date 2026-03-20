@@ -19,6 +19,8 @@ namespace asset_monitoring.Services
         public bool IsActive { get; set; } = true;
         public string? Remarks { get; set; }          // operator comment
         public string? UpdatedBy { get; set; }        // operator mobile (set by handler)
+        public string? OperatorMobile { get; set; }   // assigned operator's mobile
+        public string? JeMobile { get; set; }          // assigned JE's mobile
     }
 
     public class AddPumpRequest
@@ -29,6 +31,9 @@ namespace asset_monitoring.Services
         public string Status { get; set; } = "OFF";
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
+        public string? OperatorMobile { get; set; }
+        public string? JeMobile { get; set; }
+        public string? UpdatedBy { get; set; }
     }
 
     public class AssignOperatorRequest
@@ -100,7 +105,7 @@ namespace asset_monitoring.Services
         {
             try
             {
-                // For non-admin: look up the operator's mobile (used as UpdatedBy key)
+                // For non-admin: look up the operator's mobile (used as operator_mobile filter key)
                 string? operatorMobile = null;
                 if (user_type != "ADMIN" && userId.HasValue)
                 {
@@ -129,7 +134,7 @@ namespace asset_monitoring.Services
                     from loc   in locGroup.DefaultIfEmpty()
                     join entry in _db.PumpStatusEntries  on pump.PumpId equals entry.PumpId into entryGroup
                     from entry in entryGroup.DefaultIfEmpty()
-                    where operatorMobile == null || (entry != null && entry.UpdatedBy == operatorMobile)
+                    where operatorMobile == null || (entry != null && entry.OperatorMobile == operatorMobile)
                     select new
                     {
                         pump.PumpId,
@@ -140,7 +145,7 @@ namespace asset_monitoring.Services
                         EntryStatus      = entry != null ? (PumpStatus?)entry.Status : null,
                         CurrentStartTime = entry != null ? entry.CurrentStartTime    : (DateTime?)null,
                         LastUpdated      = entry != null ? entry.RowUpdationDateTime : pump.RowUpdationDateTime,
-                        OperatorMobile   = entry != null ? entry.UpdatedBy           : null,
+                        OperatorMobile   = entry != null ? entry.OperatorMobile      : null,
                         JeMobile         = entry != null ? entry.JeMobile            : null
                     }
                 ).AsNoTracking().ToListAsync();
@@ -221,6 +226,7 @@ namespace asset_monitoring.Services
                 pump.VendorName          = req.VendorName;
                 pump.Category            = req.Category;
                 pump.IsActive            = req.IsActive;
+                pump.UpdatedBy           = req.UpdatedBy;
                 pump.RowUpdationDateTime = now;
 
                 // 2. BdaPumpLocation (upsert)
@@ -254,6 +260,16 @@ namespace asset_monitoring.Services
                     _             => PumpStatus.Off
                 };
 
+                // Look up operator's display name from mobile (for updated_by name storage)
+                string? operatorName = null;
+                if (!string.IsNullOrEmpty(req.OperatorMobile))
+                {
+                    operatorName = await _db.BdaUserMasters
+                        .Where(u => u.MobileNumber == req.OperatorMobile && u.IsActive)
+                        .Select(u => u.Name)
+                        .FirstOrDefaultAsync() ?? req.OperatorMobile;
+                }
+
                 var entry = await _db.PumpStatusEntries.FindAsync(req.PumpId);
                 if (entry == null)
                 {
@@ -262,7 +278,9 @@ namespace asset_monitoring.Services
                         PumpId               = req.PumpId,
                         Status               = newStatus,
                         Remarks              = req.Remarks,
-                        UpdatedBy            = req.UpdatedBy,
+                        UpdatedBy            = operatorName,
+                        OperatorMobile       = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile,
+                        JeMobile             = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile,
                         CurrentStartTime     = newStatus == PumpStatus.On ? now : null,
                         RowActionCount       = 1,
                         RowInsertionDateTime = now,
@@ -304,7 +322,13 @@ namespace asset_monitoring.Services
 
                     entry.Status              = newStatus;
                     entry.Remarks             = req.Remarks;
-                    entry.UpdatedBy           = req.UpdatedBy;
+                    if (req.OperatorMobile != null)
+                    {
+                        entry.UpdatedBy      = operatorName;
+                        entry.OperatorMobile = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile;
+                    }
+                    if (req.JeMobile != null)
+                        entry.JeMobile  = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile;
                     entry.RowActionCount     += 1;
                     entry.RowUpdationDateTime = now;
                 }
@@ -369,7 +393,13 @@ namespace asset_monitoring.Services
                     return false;
                 }
 
-                entry.UpdatedBy           = req.OperatorMobile;
+                var opName = await _db.BdaUserMasters
+                    .Where(u => u.MobileNumber == req.OperatorMobile && u.IsActive)
+                    .Select(u => u.Name)
+                    .FirstOrDefaultAsync() ?? req.OperatorMobile;
+
+                entry.UpdatedBy           = opName;
+                entry.OperatorMobile      = req.OperatorMobile;
                 entry.RowUpdationDateTime = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
 
@@ -380,6 +410,150 @@ namespace asset_monitoring.Services
             catch (Exception ex)
             {
                 Logger.Error(ex, "AssignOperatorAsync failed for pumpId={0}", req.PumpId);
+                throw;
+            }
+        }
+
+        // ── Get active operators and JEs for pump drawer dropdowns ────────────
+        public async Task<List<UserSelectionDto>> GetActiveUsersForDrawerAsync()
+        {
+            return await _db.BdaUserMasters
+                .Where(u => u.IsActive && u.MobileNumber != null &&
+                       (u.UserType == BdaUserType.OPERATOR || u.UserType == BdaUserType.JE))
+                .AsNoTracking()
+                .OrderBy(u => u.UserType).ThenBy(u => u.Name)
+                .Select(u => new UserSelectionDto
+                {
+                    Mobile   = u.MobileNumber!,
+                    Name     = u.Name ?? u.MobileNumber!,
+                    UserType = u.UserType.ToString()
+                })
+                .ToListAsync();
+        }
+
+        // ── Pump Running Summary (today + this month run hours per pump) ──────
+        public async Task<List<PumpRunningSummaryDto>> GetPumpRunningSummaryAsync(
+            int? userId = null, string? userType = "ADMIN")
+        {
+            Logger.Debug("GetPumpRunningSummaryAsync: userId={0}, userType={1}", userId, userType);
+            try
+            {
+                var nowUtc = DateTime.UtcNow;
+
+                // IST boundaries for today and this month
+                var ist = TimeZoneInfo.FindSystemTimeZoneById(
+                    OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+                var nowIst       = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, ist);
+                var todayStartUtc = TimeZoneInfo.ConvertTimeToUtc(nowIst.Date, ist);
+                var monthStartUtc = TimeZoneInfo.ConvertTimeToUtc(new DateTime(nowIst.Year, nowIst.Month, 1), ist);
+
+                // Operator mobile filter (mirrors FetchFromDatabaseAsync logic)
+                string? operatorMobile = null;
+                if (userType != "ADMIN" && userId.HasValue)
+                {
+                    operatorMobile = await _db.BdaUserMasters
+                        .Where(u => u.UserId == userId.Value && u.IsActive)
+                        .Select(u => u.MobileNumber)
+                        .FirstOrDefaultAsync();
+                }
+
+                // Fetch active pumps with current status entry
+                var pumpData = await (
+                    from pump  in _db.BdaPumpMasters
+                    where pump.IsActive
+                    join loc   in _db.BdaPumpLocations  on pump.PumpId equals loc.PumpId   into lg
+                    from loc   in lg.DefaultIfEmpty()
+                    join entry in _db.PumpStatusEntries on pump.PumpId equals entry.PumpId into eg
+                    from entry in eg.DefaultIfEmpty()
+                    where operatorMobile == null || (entry != null && entry.OperatorMobile == operatorMobile)
+                    select new
+                    {
+                        pump.PumpId,
+                        pump.VendorName,
+                        LocationName     = loc   != null ? loc.LocationName          : null,
+                        EntryStatus      = entry != null ? (PumpStatus?)entry.Status : null,
+                        CurrentStartTime = entry != null ? entry.CurrentStartTime    : (DateTime?)null,
+                        LastUpdated      = entry != null ? entry.RowUpdationDateTime : pump.RowUpdationDateTime,
+                        OperatorMobile   = entry != null ? entry.OperatorMobile      : null,
+                    }
+                ).AsNoTracking().ToListAsync();
+
+                var pumpIds = pumpData.Select(p => p.PumpId).ToList();
+
+                // Fetch completed ON→OFF/MAINTENANCE log entries within this month
+                var logs = await _db.PumpStatusLogs
+                    .Where(l => pumpIds.Contains(l.PumpId)
+                             && l.OldStatus == PumpStatus.On
+                             && l.StartTime.HasValue
+                             && l.EndTime.HasValue
+                             && l.EndTime.Value >= monthStartUtc)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Build operator name lookup
+                var mobileSet = pumpData
+                    .Where(p => p.OperatorMobile != null)
+                    .Select(p => p.OperatorMobile!)
+                    .Distinct().ToList();
+                var nameDict = (await _db.BdaUserMasters
+                    .Where(u => mobileSet.Contains(u.MobileNumber!))
+                    .AsNoTracking()
+                    .Select(u => new { u.MobileNumber, u.Name })
+                    .ToListAsync())
+                    .ToDictionary(u => u.MobileNumber!, u => u.Name ?? "");
+
+                var result = pumpData.Select(p =>
+                {
+                    var pumpLogs = logs.Where(l => l.PumpId == p.PumpId).ToList();
+
+                    // Completed sessions: today
+                    int todayMinutes = pumpLogs
+                        .Where(l => l.EndTime!.Value >= todayStartUtc)
+                        .Sum(l =>
+                        {
+                            var start = l.StartTime!.Value < todayStartUtc ? todayStartUtc : l.StartTime.Value;
+                            return Math.Max(0, (int)(l.EndTime!.Value - start).TotalMinutes);
+                        });
+
+                    // Completed sessions: this month
+                    int monthMinutes = pumpLogs.Sum(l =>
+                    {
+                        var start = l.StartTime!.Value < monthStartUtc ? monthStartUtc : l.StartTime.Value;
+                        return Math.Max(0, (int)(l.EndTime!.Value - start).TotalMinutes);
+                    });
+
+                    // Add live running session if pump is currently ON
+                    if (p.EntryStatus == PumpStatus.On && p.CurrentStartTime.HasValue)
+                    {
+                        var sessionStart = p.CurrentStartTime.Value;
+                        todayMinutes  += (int)(nowUtc - (sessionStart < todayStartUtc  ? todayStartUtc  : sessionStart)).TotalMinutes;
+                        monthMinutes  += (int)(nowUtc - (sessionStart < monthStartUtc  ? monthStartUtc  : sessionStart)).TotalMinutes;
+                    }
+
+                    return new PumpRunningSummaryDto
+                    {
+                        PumpId          = p.PumpId.ToString(),
+                        VendorName      = p.VendorName,
+                        Location        = p.LocationName,
+                        Status          = p.EntryStatus switch
+                        {
+                            PumpStatus.On          => "ON",
+                            PumpStatus.Maintenance => "MAINTENANCE",
+                            _                      => "OFF"
+                        },
+                        TodayRunMinutes = Math.Max(0, todayMinutes),
+                        MonthRunMinutes = Math.Max(0, monthMinutes),
+                        LastUpdated     = p.LastUpdated,
+                        OperatorName    = p.OperatorMobile != null && nameDict.TryGetValue(p.OperatorMobile, out var opN) ? opN : null,
+                    };
+                }).ToList();
+
+                Logger.Debug("GetPumpRunningSummaryAsync: summary built for {0} pumps", result.Count);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "GetPumpRunningSummaryAsync failed");
                 throw;
             }
         }
@@ -403,6 +577,7 @@ namespace asset_monitoring.Services
                 VendorName           = req.VendorName,
                 Category             = req.Category,
                 IsActive             = true,
+                UpdatedBy            = req.UpdatedBy,
                 RowActionCount       = 1,
                 RowInsertionDateTime = now,
                 RowUpdationDateTime  = now
@@ -422,11 +597,24 @@ namespace asset_monitoring.Services
                 RowUpdationDateTime  = now
             });
 
+            // Look up operator name for updated_by
+            string? opName = null;
+            if (!string.IsNullOrEmpty(req.OperatorMobile))
+            {
+                opName = await _db.BdaUserMasters
+                    .Where(u => u.MobileNumber == req.OperatorMobile && u.IsActive)
+                    .Select(u => u.Name)
+                    .FirstOrDefaultAsync() ?? req.OperatorMobile;
+            }
+
             // Seed an initial OFF status entry so the pump appears on the dashboard
             _db.PumpStatusEntries.Add(new PumpStatusEntry
             {
                 PumpId               = pump.PumpId,
                 Status               = PumpStatus.Off,
+                UpdatedBy            = opName,
+                OperatorMobile       = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile,
+                JeMobile             = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile,
                 RowActionCount       = 1,
                 RowInsertionDateTime = now,
                 RowUpdationDateTime  = now
@@ -458,5 +646,24 @@ namespace asset_monitoring.Services
         public string? JeMobile { get; set; }
         /// <summary>Kept for backward compat — same as OperatorMobile.</summary>
         public string? MobileNumber => OperatorMobile;
+    }
+
+    public class UserSelectionDto
+    {
+        public string Mobile   { get; set; } = "";
+        public string Name     { get; set; } = "";
+        public string UserType { get; set; } = "";
+    }
+
+    public class PumpRunningSummaryDto
+    {
+        public string PumpId { get; set; } = "";
+        public string? VendorName { get; set; }
+        public string? Location { get; set; }
+        public string? Status { get; set; }
+        public int TodayRunMinutes { get; set; }
+        public int MonthRunMinutes { get; set; }
+        public DateTime LastUpdated { get; set; }
+        public string? OperatorName { get; set; }
     }
 }

@@ -28,11 +28,18 @@ namespace asset_monitoring.Pages
         public List<BdaUserMaster> Users { get; set; } = new();
         public List<DashboardPumpDto> Pumps { get; set; } = new();
         public List<BdaPumpLocation> Locations { get; set; } = new();
+        public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
         public bool IsAdmin { get; set; }
         public string? LoggedInUserName { get; set; }
 
         public async Task<IActionResult> OnGetAsync()
         {
+            if (!IsLoggedIn)
+            {
+                Logger.Warn("OnGetAsync: unauthenticated access attempt to admin page");
+                return RedirectToPage("/Index");
+            }
+
             var userType = HttpContext.Session.GetString("UserType");
             IsAdmin = userType == "ADMIN";
             LoggedInUserName = Username;
@@ -40,7 +47,7 @@ namespace asset_monitoring.Pages
             if (!IsAdmin)
             {
                 Logger.Warn("OnGetAsync: non-admin access attempt by user={0}, userType={1}", Username, userType);
-                return Page();
+                return RedirectToPage("/Index");
             }
 
             Logger.Info("OnGetAsync: admin page loaded by user={0}", Username);
@@ -52,6 +59,7 @@ namespace asset_monitoring.Pages
 
             // No username filter for admin: fetch all active pumps with mobile number
             Pumps = await _pumpDashboardService.GetPumpsAsync();
+            RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync();
 
             Locations = await _context.BdaPumpLocations
                 .AsNoTracking()
@@ -65,9 +73,13 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostUpdatePumpAsync([FromBody] UpdatePumpRequest req)
         {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             Logger.Info("OnPostUpdatePumpAsync: pumpId={0} by admin={1}", req.PumpId, Username);
             try
             {
+                req.UpdatedBy = Username;
                 await _pumpDashboardService.UpdatePumpDetailsAsync(req);
                 Logger.Info("OnPostUpdatePumpAsync: pumpId={0} updated successfully", req.PumpId);
                 return new JsonResult(new { success = true });
@@ -81,9 +93,13 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostAddPumpAsync([FromBody] AddPumpRequest req)
         {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             Logger.Info("OnPostAddPumpAsync: vendor={0}, location={1} by admin={2}", req.VendorName, req.LocationName, Username);
             try
             {
+                req.UpdatedBy = Username;
                 var newId = await _pumpDashboardService.AddPumpAsync(req);
                 Logger.Info("OnPostAddPumpAsync: created pumpId={0}", newId);
                 return new JsonResult(new { success = true, pumpId = newId });
@@ -97,6 +113,9 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by admin={1}", id, Username);
             await _pumpDashboardService.DeletePumpAsync(id);
             return RedirectToPage();
@@ -106,6 +125,9 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostUpdateUserAsync([FromBody] EditUserInputModel req)
         {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             if (req == null || req.UserId <= 0)
             {
                 Logger.Warn("OnPostUpdateUserAsync: invalid input, userId={0}", req?.UserId);
@@ -124,6 +146,8 @@ namespace asset_monitoring.Pages
                 }
 
                 user.Name = req.Name;
+                if (!string.IsNullOrWhiteSpace(req.Username))
+                    user.Username = req.Username;
                 if (Enum.TryParse<BdaUserType>(req.UserType, true, out var parsedType))
                     user.UserType = parsedType;
                 user.MobileNumber = req.MobileNumber;
@@ -147,10 +171,13 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostAddUserAsync([FromBody] EditUserInputModel req)
         {
-            if (req == null || string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.MobileNumber))
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
+            if (req == null || string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.MobileNumber) || string.IsNullOrWhiteSpace(req.Username))
             {
                 Logger.Warn("OnPostAddUserAsync: missing required fields");
-                return new JsonResult(new { success = false, message = "Name and Mobile are required" });
+                return new JsonResult(new { success = false, message = "Name, Username and Mobile are required" });
             }
 
             Logger.Info("OnPostAddUserAsync: name={0}, userType={1} by admin={2}", req.Name, req.UserType, Username);
@@ -163,6 +190,7 @@ namespace asset_monitoring.Pages
                 var user = new BdaUserMaster
                 {
                     Name = req.Name,
+                    Username = req.Username,
                     UserType = parsedType,
                     MobileNumber = req.MobileNumber,
                     Password = req.Password, // Sprint 4: hash this
@@ -187,6 +215,9 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnPostDeleteUserAsync(int id)
         {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
             Logger.Info("OnPostDeleteUserAsync: deactivating userId={0} by admin={1}", id, Username);
             try
             {
@@ -210,6 +241,12 @@ namespace asset_monitoring.Pages
                 Logger.Error(ex, "OnPostDeleteUserAsync failed for userId={0}", id);
                 return new JsonResult(new { success = false, message = "An error occurred" });
             }
+        }
+
+        public async Task<JsonResult> OnGetActiveUsersAsync()
+        {
+            var users = await _pumpDashboardService.GetActiveUsersForDrawerAsync();
+            return new JsonResult(users);
         }
 
         public IActionResult OnGetDownloadReport()
@@ -245,6 +282,7 @@ namespace asset_monitoring.Pages
     {
         public int UserId { get; set; }
         public string Name { get; set; } = "";
+        public string Username { get; set; } = "";
         public string UserType { get; set; } = "";
         public string MobileNumber { get; set; } = "";
         public string Password { get; set; } = "";
