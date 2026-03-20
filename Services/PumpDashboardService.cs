@@ -61,13 +61,15 @@ namespace asset_monitoring.Services
 
         private readonly ApplicationDbContext _db;
         private readonly IMemoryCache _cache;
+        private readonly DailySummaryService _dailySummary;
 
         private const string ADMIN_CACHE_KEY = "PUMP_DASHBOARD_ADMIN";
 
-        public PumpDashboardService(ApplicationDbContext db, IMemoryCache cache)
+        public PumpDashboardService(ApplicationDbContext db, IMemoryCache cache, DailySummaryService dailySummary)
         {
             _db = db;
             _cache = cache;
+            _dailySummary = dailySummary;
         }
 
         // ── Force-invalidate the ADMIN pump cache ─────────────────────────────
@@ -342,6 +344,22 @@ namespace asset_monitoring.Services
                 await _db.SaveChangesAsync();
                 _cache.Remove(ADMIN_CACHE_KEY);
                 Logger.Info("UpdatePumpDetailsAsync: pumpId={0} updated via EF Core", req.PumpId);
+
+                // Refresh today's daily summary in the background (fire-and-forget)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var ist = TimeZoneInfo.FindSystemTimeZoneById(
+                            OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+                        var todayIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ist).Date;
+                        await _dailySummary.BuildSummaryForDateAsync(todayIst);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, "Background daily summary refresh failed for pumpId={0}", req.PumpId);
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -440,13 +458,11 @@ namespace asset_monitoring.Services
             try
             {
                 var nowUtc = DateTime.UtcNow;
-
-                // IST boundaries for today and this month
                 var ist = TimeZoneInfo.FindSystemTimeZoneById(
                     OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
-                var nowIst       = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, ist);
-                var todayStartUtc = TimeZoneInfo.ConvertTimeToUtc(nowIst.Date, ist);
-                var monthStartUtc = TimeZoneInfo.ConvertTimeToUtc(new DateTime(nowIst.Year, nowIst.Month, 1), ist);
+                var nowIst    = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, ist);
+                var todayIst  = nowIst.Date;
+                var monthStartIst = new DateTime(nowIst.Year, nowIst.Month, 1);
 
                 // Mobile filter — OPERATOR filters by operator_mobile, JE filters by je_mobile
                 string? operatorMobile = null;
@@ -481,7 +497,6 @@ namespace asset_monitoring.Services
                         pump.VendorName,
                         LocationName     = loc   != null ? loc.LocationName          : null,
                         EntryStatus      = entry != null ? (PumpStatus?)entry.Status : null,
-                        CurrentStartTime = entry != null ? entry.CurrentStartTime    : (DateTime?)null,
                         LastUpdated      = entry != null ? entry.RowUpdationDateTime : pump.RowUpdationDateTime,
                         OperatorMobile   = entry != null ? entry.OperatorMobile      : null,
                     }
@@ -489,13 +504,11 @@ namespace asset_monitoring.Services
 
                 var pumpIds = pumpData.Select(p => p.PumpId).ToList();
 
-                // Fetch completed ON→OFF/MAINTENANCE log entries within this month
-                var logs = await _db.PumpStatusLogs
-                    .Where(l => pumpIds.Contains(l.PumpId)
-                             && l.OldStatus == PumpStatus.On
-                             && l.StartTime.HasValue
-                             && l.EndTime.HasValue
-                             && l.EndTime.Value >= monthStartUtc)
+                // ── Pull pre-computed daily summaries for this month ─────────
+                var dailySummaries = await _db.PumpDailySummaries
+                    .Where(s => pumpIds.Contains(s.PumpId)
+                             && s.SummaryDate >= monthStartIst
+                             && s.SummaryDate <= todayIst)
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -513,47 +526,38 @@ namespace asset_monitoring.Services
 
                 var result = pumpData.Select(p =>
                 {
-                    var pumpLogs = logs.Where(l => l.PumpId == p.PumpId).ToList();
+                    var pumpSummaries = dailySummaries.Where(s => s.PumpId == p.PumpId).ToList();
 
-                    // Completed sessions: today
-                    int todayMinutes = pumpLogs
-                        .Where(l => l.EndTime!.Value >= todayStartUtc)
-                        .Sum(l =>
-                        {
-                            var start = l.StartTime!.Value < todayStartUtc ? todayStartUtc : l.StartTime.Value;
-                            return Math.Max(0, (int)(l.EndTime!.Value - start).TotalMinutes);
-                        });
+                    // Today's breakdown (single row for today)
+                    var todaySummary = pumpSummaries.FirstOrDefault(s => s.SummaryDate == todayIst);
+                    int todayOn   = todaySummary?.OnMinutes          ?? 0;
+                    int todayOff  = todaySummary?.OffMinutes         ?? 0;
+                    int todayMnt  = todaySummary?.MaintenanceMinutes ?? 0;
 
-                    // Completed sessions: this month
-                    int monthMinutes = pumpLogs.Sum(l =>
-                    {
-                        var start = l.StartTime!.Value < monthStartUtc ? monthStartUtc : l.StartTime.Value;
-                        return Math.Max(0, (int)(l.EndTime!.Value - start).TotalMinutes);
-                    });
-
-                    // Add live running session if pump is currently ON
-                    if (p.EntryStatus == PumpStatus.On && p.CurrentStartTime.HasValue)
-                    {
-                        var sessionStart = p.CurrentStartTime.Value;
-                        todayMinutes  += (int)(nowUtc - (sessionStart < todayStartUtc  ? todayStartUtc  : sessionStart)).TotalMinutes;
-                        monthMinutes  += (int)(nowUtc - (sessionStart < monthStartUtc  ? monthStartUtc  : sessionStart)).TotalMinutes;
-                    }
+                    // This month's breakdown (sum all days in month)
+                    int monthOn   = pumpSummaries.Sum(s => s.OnMinutes);
+                    int monthOff  = pumpSummaries.Sum(s => s.OffMinutes);
+                    int monthMnt  = pumpSummaries.Sum(s => s.MaintenanceMinutes);
 
                     return new PumpRunningSummaryDto
                     {
-                        PumpId          = p.PumpId.ToString(),
-                        VendorName      = p.VendorName,
-                        Location        = p.LocationName,
-                        Status          = p.EntryStatus switch
+                        PumpId                   = p.PumpId.ToString(),
+                        VendorName               = p.VendorName,
+                        Location                 = p.LocationName,
+                        Status                   = p.EntryStatus switch
                         {
                             PumpStatus.On          => "ON",
                             PumpStatus.Maintenance => "MAINTENANCE",
                             _                      => "OFF"
                         },
-                        TodayRunMinutes = Math.Max(0, todayMinutes),
-                        MonthRunMinutes = Math.Max(0, monthMinutes),
-                        LastUpdated     = p.LastUpdated,
-                        OperatorName    = p.OperatorMobile != null && nameDict.TryGetValue(p.OperatorMobile, out var opN) ? opN : null,
+                        TodayRunMinutes          = Math.Max(0, todayOn),
+                        TodayOffMinutes          = Math.Max(0, todayOff),
+                        TodayMaintenanceMinutes  = Math.Max(0, todayMnt),
+                        MonthRunMinutes          = Math.Max(0, monthOn),
+                        MonthOffMinutes          = Math.Max(0, monthOff),
+                        MonthMaintenanceMinutes  = Math.Max(0, monthMnt),
+                        LastUpdated              = p.LastUpdated,
+                        OperatorName             = p.OperatorMobile != null && nameDict.TryGetValue(p.OperatorMobile, out var opN) ? opN : null,
                     };
                 }).ToList();
 
@@ -660,8 +664,17 @@ namespace asset_monitoring.Services
         public string? VendorName { get; set; }
         public string? Location { get; set; }
         public string? Status { get; set; }
+
+        // Today breakdown
         public int TodayRunMinutes { get; set; }
+        public int TodayOffMinutes { get; set; }
+        public int TodayMaintenanceMinutes { get; set; }
+
+        // This month breakdown
         public int MonthRunMinutes { get; set; }
+        public int MonthOffMinutes { get; set; }
+        public int MonthMaintenanceMinutes { get; set; }
+
         public DateTime LastUpdated { get; set; }
         public string? OperatorName { get; set; }
     }

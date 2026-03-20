@@ -20,23 +20,51 @@
         </span>
     </div>
     <div class="table-responsive">
-        <table class="table table-dashboard align-middle">
+        <table class="table table-dashboard align-middle text-center">
             <thead>
                 <tr>
-                    <th>PUMP ID</th>
-                    <th>VENDOR</th>
-                    <th>LOCATION</th>
-                    <th>STATUS</th>
-                    <th>TODAY</th>
-                    <th>THIS MONTH</th>
-                    <th>LAST UPDATED</th>
+                    <th rowspan="2" class="align-middle text-start">PUMP ID</th>
+                    <th rowspan="2" class="align-middle text-start">VENDOR</th>
+                    <th rowspan="2" class="align-middle text-start">LOCATION</th>
+                    <th rowspan="2" class="align-middle">STATUS</th>
+                    <th colspan="3" class="text-center border-bottom-0"
+                        style="background:#e8f5e9; color:#2e7d32;">
+                        <i class="bi bi-sun me-1"></i>TODAY
+                    </th>
+                    <th colspan="3" class="text-center border-bottom-0"
+                        style="background:#e3f2fd; color:#1565c0;">
+                        <i class="bi bi-calendar3 me-1"></i>THIS MONTH
+                    </th>
+                    <th rowspan="2" class="align-middle">LAST UPDATED</th>
+                </tr>
+                <tr>
+                    @* Today sub-columns *@
+                    <th style="background:#e8f5e9; font-size:0.75rem;">
+                        <i class="bi bi-play-circle text-success"></i> Running
+                    </th>
+                    <th style="background:#e8f5e9; font-size:0.75rem;">
+                        <i class="bi bi-stop-circle text-danger"></i> OFF
+                    </th>
+                    <th style="background:#e8f5e9; font-size:0.75rem;">
+                        <i class="bi bi-wrench text-warning"></i> Maint.
+                    </th>
+                    @* Month sub-columns *@
+                    <th style="background:#e3f2fd; font-size:0.75rem;">
+                        <i class="bi bi-play-circle text-success"></i> Running
+                    </th>
+                    <th style="background:#e3f2fd; font-size:0.75rem;">
+                        <i class="bi bi-stop-circle text-danger"></i> OFF
+                    </th>
+                    <th style="background:#e3f2fd; font-size:0.75rem;">
+                        <i class="bi bi-wrench text-warning"></i> Maint.
+                    </th>
                 </tr>
             </thead>
             <tbody>
             @if (Model == null || !Model.Any())
             {
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-3">No data available</td>
+                    <td colspan="11" class="text-center text-muted py-3">No data available</td>
                 </tr>
             }
             else
@@ -44,9 +72,9 @@
                 foreach (var item in Model)
                 {
                     <tr>
-                        <td class="fw-semibold">@item.PumpId</td>
-                        <td>@item.VendorName</td>
-                        <td>@item.Location</td>
+                        <td class="fw-semibold text-start">@item.PumpId</td>
+                        <td class="text-start">@item.VendorName</td>
+                        <td class="text-start">@item.Location</td>
                         <td>
                             @if (item.Status == "ON")
                             {
@@ -61,14 +89,36 @@
                                 <span class="badge-status-off">OFF</span>
                             }
                         </td>
+                        @* ── Today columns ── *@
                         <td>
                             <span class="fw-semibold @(item.TodayRunMinutes > 0 ? "text-success" : "text-muted")">
-                                <i class="bi bi-clock me-1"></i>@FormatRunTime(item.TodayRunMinutes)
+                                @FormatRunTime(item.TodayRunMinutes)
                             </span>
                         </td>
                         <td>
-                            <span class="fw-semibold @(item.MonthRunMinutes > 0 ? "text-primary" : "text-muted")">
-                                <i class="bi bi-calendar3 me-1"></i>@FormatRunTime(item.MonthRunMinutes)
+                            <span class="fw-semibold @(item.TodayOffMinutes > 0 ? "text-danger" : "text-muted")">
+                                @FormatRunTime(item.TodayOffMinutes)
+                            </span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold @(item.TodayMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
+                                @FormatRunTime(item.TodayMaintenanceMinutes)
+                            </span>
+                        </td>
+                        @* ── Month columns ── *@
+                        <td>
+                            <span class="fw-semibold @(item.MonthRunMinutes > 0 ? "text-success" : "text-muted")">
+                                @FormatRunTime(item.MonthRunMinutes)
+                            </span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold @(item.MonthOffMinutes > 0 ? "text-danger" : "text-muted")">
+                                @FormatRunTime(item.MonthOffMinutes)
+                            </span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold @(item.MonthMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
+                                @FormatRunTime(item.MonthMaintenanceMinutes)
                             </span>
                         </td>
                         <td class="text-muted small">

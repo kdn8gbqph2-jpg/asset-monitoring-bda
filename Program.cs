@@ -33,6 +33,8 @@ try
     builder.Services.AddSingleton<UserCacheService>();
     builder.Services.AddScoped<PumpDashboardService>();
     builder.Services.AddScoped<ReportExportService>();
+    builder.Services.AddSingleton<DailySummaryService>();
+    builder.Services.AddHostedService<DailySummaryBackgroundService>();
 
     builder.Services.AddSession(options =>
     {

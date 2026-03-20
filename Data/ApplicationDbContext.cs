@@ -18,6 +18,7 @@ namespace asset_monitoring.Data
 
         public DbSet<PumpStatusLog> PumpStatusLogs { get; set; } = null!;
         public DbSet<PumpStatusEntry> PumpStatusEntries { get; set; } = null!;
+        public DbSet<PumpDailySummary> PumpDailySummaries { get; set; } = null!;
 
         public DbSet<ActiveUsers> ActiveUsers => Set<ActiveUsers>();
 
@@ -28,6 +29,7 @@ namespace asset_monitoring.Data
             modelBuilder.ApplyConfiguration(new BdaUserMasterConfig());
             modelBuilder.ApplyConfiguration(new PumpStatusEntryConfig());
             modelBuilder.ApplyConfiguration(new PumpStatusLogConfig());
+            modelBuilder.ApplyConfiguration(new PumpDailySummaryConfig());
 
             modelBuilder.Entity<ActiveUsers>(entity =>
             {
