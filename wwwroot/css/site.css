@@ -78,6 +78,14 @@ html {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 1.5rem;
+    width: 100%;
+}
+
+/* Pad the dashboard body content away from the edges */
+.container-fluid > main > .container {
+    max-width: 100%;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 .dash-navbar .nav-title {
