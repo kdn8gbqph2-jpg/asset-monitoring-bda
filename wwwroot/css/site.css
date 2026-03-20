@@ -26,6 +26,7 @@ body {
     background-color: var(--primary-color);
     padding-top: 0.65rem;
     padding-bottom: 0.65rem;
+    margin-bottom: 0 !important;
 }
 
     .dashboard-navbar .navbar-brand,
@@ -41,6 +42,9 @@ body {
         .dashboard-navbar .nav-link:hover {
             color: #E0E7FF !important;
         }
+
+/* Remove any gap between header and body */
+header { margin-bottom: 0 !important; }
 
 html {
     font-size: 14px;
@@ -117,6 +121,33 @@ html {
 }
 
 .dash-navbar .btn-nav-primary:hover { background: #1d4ed8; }
+
+/* Download button colors */
+.dash-navbar .btn-nav-excel {
+    background: rgba(33, 115, 70, 0.85);
+    border-color: #217346;
+    color: #fff;
+}
+.dash-navbar .btn-nav-excel:hover { background: #217346; }
+
+.dash-navbar .btn-nav-pdf {
+    background: rgba(185, 28, 28, 0.85);
+    border-color: #b91c1c;
+    color: #fff;
+}
+.dash-navbar .btn-nav-pdf:hover { background: #b91c1c; }
+
+.dash-navbar .btn-nav-csv {
+    background: rgba(14, 116, 144, 0.85);
+    border-color: #0e7490;
+    color: #fff;
+}
+.dash-navbar .btn-nav-csv:hover { background: #0e7490; }
+
+.btn-nav-label {
+    font-size: 0.78rem;
+    margin-left: 2px;
+}
 
 /* KPI */
 .kpi-card {
