@@ -21,7 +21,7 @@ namespace asset_monitoring.Services
         }
 
         // Replaces sp_get_active_users() with a direct EF Core query.
-        // UserName is set to MobileNumber because login uses mobile as the key.
+        // Cache is keyed by BOTH username and mobile number so either can be used to login.
         private void Load()
         {
             try
@@ -36,7 +36,7 @@ namespace asset_monitoring.Services
                     {
                         UserId       = u.UserId,
                         Name         = u.Name         ?? "",
-                        UserName     = u.MobileNumber ?? "",   // mobile is the login key
+                        UserName     = u.Username     ?? u.MobileNumber ?? "",
                         UserType     = u.UserType.HasValue
                                            ? u.UserType.Value.ToString()
                                            : "",
@@ -45,11 +45,18 @@ namespace asset_monitoring.Services
                     })
                     .ToList();
 
-                Users = users
-                    .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
-                    .ToDictionary(u => u.UserName, u => u);
+                // Index by username AND mobile number — whichever the user types at login works
+                var dict = new Dictionary<string, ActiveUsers>(StringComparer.OrdinalIgnoreCase);
+                foreach (var u in users)
+                {
+                    if (!string.IsNullOrWhiteSpace(u.UserName))
+                        dict[u.UserName] = u;
+                    if (!string.IsNullOrWhiteSpace(u.MobileNumber) && !dict.ContainsKey(u.MobileNumber))
+                        dict[u.MobileNumber] = u;
+                }
+                Users = dict;
 
-                Logger.Info("UserCacheService.Load: {0} active users loaded into cache", Users.Count);
+                Logger.Info("UserCacheService.Load: {0} active users loaded into cache ({1} keys)", users.Count, Users.Count);
             }
             catch (Exception ex)
             {

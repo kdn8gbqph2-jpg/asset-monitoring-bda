@@ -20,6 +20,10 @@ namespace asset_monitoring.Data.Configurations
                   .HasColumnName("name")
                   .HasMaxLength(100);
 
+            entity.Property(e => e.Username)
+                  .HasColumnName("username")
+                  .HasMaxLength(50);
+
             // Map enum to string and specify MySQL enum column type
             entity.Property(e => e.UserType)
                   .HasColumnName("user_type")
