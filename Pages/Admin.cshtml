@@ -46,8 +46,13 @@
                         </td>
                         <td class="user-mobile">@user.MobileNumber</td>
                         <td>
-                            <button type="button" class="btn btn-outline-primary btn-sm" title="Edit"
-                                    onclick="openEditUserDrawer(@user.UserId, @Html.Raw(Json.Serialize(user.Name)), @Html.Raw(Json.Serialize(user.Username ?? "")), @Html.Raw(Json.Serialize(user.UserType?.ToString() ?? "")), @Html.Raw(Json.Serialize(user.MobileNumber)), @user.IsActive.ToString().ToLower())">
+                            <button type="button" class="btn btn-outline-primary btn-sm edit-user-btn" title="Edit"
+                                    data-uid="@user.UserId"
+                                    data-name="@user.Name"
+                                    data-username="@(user.Username ?? "")"
+                                    data-role="@user.UserType"
+                                    data-mobile="@user.MobileNumber"
+                                    data-active="@user.IsActive.ToString().ToLower()">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button type="button" class="btn btn-outline-danger btn-sm" title="Delete"
@@ -132,14 +137,15 @@
         return bootstrap.Offcanvas.getInstance(el) ?? new bootstrap.Offcanvas(el);
     }
 
-    function openEditUserDrawer(userId, name, username, role, mobile, isActive) {
-        document.getElementById('editUserId').value        = userId;
-        document.getElementById('editUserName').value      = name;
-        document.getElementById('editUserUsername').value  = username ?? '';
-        document.getElementById('editUserRole').value      = role;
-        document.getElementById('editUserMobile').value    = mobile;
-        document.getElementById('editUserPassword').value  = ''; // never prefill password
-        document.getElementById('editUserActive').checked  = (isActive === true);
+    function openEditUserDrawer(btn) {
+        const d = btn.dataset;
+        document.getElementById('editUserId').value        = d.uid;
+        document.getElementById('editUserName').value      = d.name;
+        document.getElementById('editUserUsername').value  = d.username ?? '';
+        document.getElementById('editUserRole').value      = d.role;
+        document.getElementById('editUserMobile').value    = d.mobile;
+        document.getElementById('editUserPassword').value  = '';
+        document.getElementById('editUserActive').checked  = (d.active === 'true');
 
         document.getElementById('userDrawerTitle').innerHTML =
             '<i class="bi bi-pencil-square"></i> Edit User';
@@ -223,8 +229,13 @@
         }
     }
 
-    // ── Wire "Add Pump" button from _PumpInventory partial ───────────────────
+    // ── Wire buttons on DOM ready ─────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
+        // Edit User buttons
+        document.querySelectorAll('.edit-user-btn').forEach(btn => {
+            btn.addEventListener('click', () => openEditUserDrawer(btn));
+        });
+        // Add Pump button from _PumpInventory partial
         document.querySelectorAll('.admin-add-btn[data-target="pump"]').forEach(btn => {
             btn.addEventListener('click', openAddPumpDrawer);
         });
