@@ -6,11 +6,24 @@
             <i class="bi bi-database-fill icon-title"></i>
             Pump Overview
         </h5>
-        <button type="button"
-                class="btn btn-outline-primary btn-sm"
-                onclick="window.location.href='?handler=DownloadReport'">
-            <i class="bi bi-file-earmark-excel"></i> Download Report
-        </button>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-download"></i> Download Report
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="?handler=DownloadReportXlsx">
+                    <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel (.xlsx)
+                </a></li>
+                <li><a class="dropdown-item" href="?handler=DownloadReportPdf">
+                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i> PDF (.pdf)
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="?handler=DownloadReport">
+                    <i class="bi bi-file-earmark-text text-secondary me-1"></i> CSV (.csv)
+                </a></li>
+            </ul>
+        </div>
     </div>
 
     <div class="table-responsive">

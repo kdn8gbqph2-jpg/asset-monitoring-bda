@@ -214,10 +214,22 @@ namespace asset_monitoring.Pages
 
         public IActionResult OnGetDownloadReport()
         {
-            Logger.Info("OnGetDownloadReport: report download requested by admin={0}", Username);
-            var allActivePumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
-            Logger.Info("OnGetDownloadReport: exporting {0} pumps to CSV", allActivePumps.Count);
-            return _reportExportService.ExportPumpsAsCsv(allActivePumps);
+            var pumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsCsv(pumps);
+        }
+
+        public IActionResult OnGetDownloadReportXlsx()
+        {
+            var pumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            Logger.Info("OnGetDownloadReportXlsx: {0} pumps, admin={1}", pumps.Count, Username);
+            return _reportExportService.ExportPumpsAsXlsx(pumps);
+        }
+
+        public IActionResult OnGetDownloadReportPdf()
+        {
+            var pumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            Logger.Info("OnGetDownloadReportPdf: {0} pumps, admin={1}", pumps.Count, Username);
+            return _reportExportService.ExportPumpsAsPdf(pumps);
         }
 
         public IActionResult OnPostLogout()

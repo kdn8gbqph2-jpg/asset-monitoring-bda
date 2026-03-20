@@ -203,9 +203,20 @@ namespace asset_monitoring.Pages
 
         public IActionResult OnGetDownloadReport()
         {
+            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsCsv(pumps);
+        }
 
-            var allActivePumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
-            return _reportExportService.ExportPumpsAsCsv(allActivePumps);
+        public IActionResult OnGetDownloadReportXlsx()
+        {
+            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsXlsx(pumps);
+        }
+
+        public IActionResult OnGetDownloadReportPdf()
+        {
+            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsPdf(pumps);
         }
         public class LoginInputModel
         {

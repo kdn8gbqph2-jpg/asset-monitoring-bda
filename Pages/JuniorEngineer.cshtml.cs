@@ -67,11 +67,22 @@ namespace asset_monitoring.Pages
             }
         }
 
-        // ── Download CSV report ────────────────────────────────────────────
         public IActionResult OnGetDownloadReport()
         {
             var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
             return _reportExportService.ExportPumpsAsCsv(pumps);
+        }
+
+        public IActionResult OnGetDownloadReportXlsx()
+        {
+            var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsXlsx(pumps);
+        }
+
+        public IActionResult OnGetDownloadReportPdf()
+        {
+            var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
+            return _reportExportService.ExportPumpsAsPdf(pumps);
         }
     }
 }
