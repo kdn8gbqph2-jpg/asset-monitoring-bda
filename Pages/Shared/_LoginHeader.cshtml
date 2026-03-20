@@ -10,6 +10,7 @@
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                 <li>
                     <form method="post" asp-page-handler="Logout" class="d-inline">
+                        @Html.AntiForgeryToken()
                         <button type="submit" class="dropdown-item text-danger">
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </button>
