@@ -202,21 +202,21 @@ namespace asset_monitoring.Pages
             }
         }
 
-        public IActionResult OnGetDownloadReport()
+        public async Task<IActionResult> OnGetDownloadReportAsync()
         {
-            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsCsv(pumps);
         }
 
-        public IActionResult OnGetDownloadReportXlsx()
+        public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
         {
-            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsXlsx(pumps);
         }
 
-        public IActionResult OnGetDownloadReportPdf()
+        public async Task<IActionResult> OnGetDownloadReportPdfAsync()
         {
-            var pumps = _PumpdashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
         public class LoginInputModel

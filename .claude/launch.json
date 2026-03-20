@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ASP.NET Core (HTTP)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "asset-monitoring.csproj", "--launch-profile", "http"],
+      "port": 5005
+    },
+    {
+      "name": "ASP.NET Core (HTTPS)",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "asset-monitoring.csproj", "--launch-profile", "https"],
+      "port": 7025
+    },
+    {
+      "name": "IIS Express",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "asset-monitoring.csproj", "--launch-profile", "IIS Express"],
+      "port": 53570
+    }
+  ]
+}

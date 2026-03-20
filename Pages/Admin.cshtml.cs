@@ -249,23 +249,24 @@ namespace asset_monitoring.Pages
             return new JsonResult(users);
         }
 
-        public IActionResult OnGetDownloadReport()
+        public async Task<IActionResult> OnGetDownloadReportAsync()
         {
-            var pumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _pumpDashboardService.GetPumpsAsync();
+            Logger.Info("OnGetDownloadReport: exporting {0} pumps as CSV, admin={1}", pumps.Count, Username);
             return _reportExportService.ExportPumpsAsCsv(pumps);
         }
 
-        public IActionResult OnGetDownloadReportXlsx()
+        public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
         {
-            var pumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
-            Logger.Info("OnGetDownloadReportXlsx: {0} pumps, admin={1}", pumps.Count, Username);
+            var pumps = await _pumpDashboardService.GetPumpsAsync();
+            Logger.Info("OnGetDownloadReportXlsx: exporting {0} pumps as XLSX, admin={1}", pumps.Count, Username);
             return _reportExportService.ExportPumpsAsXlsx(pumps);
         }
 
-        public IActionResult OnGetDownloadReportPdf()
+        public async Task<IActionResult> OnGetDownloadReportPdfAsync()
         {
-            var pumps = _pumpDashboardService.GetPumpsAsync().GetAwaiter().GetResult();
-            Logger.Info("OnGetDownloadReportPdf: {0} pumps, admin={1}", pumps.Count, Username);
+            var pumps = await _pumpDashboardService.GetPumpsAsync();
+            Logger.Info("OnGetDownloadReportPdf: exporting {0} pumps as PDF, admin={1}", pumps.Count, Username);
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
 

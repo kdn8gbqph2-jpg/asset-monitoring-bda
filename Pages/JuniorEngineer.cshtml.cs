@@ -82,21 +82,21 @@ namespace asset_monitoring.Pages
             return LogoutAndRedirect();
         }
 
-        public IActionResult OnGetDownloadReport()
+        public async Task<IActionResult> OnGetDownloadReportAsync()
         {
-            var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
             return _reportExportService.ExportPumpsAsCsv(pumps);
         }
 
-        public IActionResult OnGetDownloadReportXlsx()
+        public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
         {
-            var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
             return _reportExportService.ExportPumpsAsXlsx(pumps);
         }
 
-        public IActionResult OnGetDownloadReportPdf()
+        public async Task<IActionResult> OnGetDownloadReportPdfAsync()
         {
-            var pumps = _pumpService.GetPumpsAsync().GetAwaiter().GetResult();
+            var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
     }

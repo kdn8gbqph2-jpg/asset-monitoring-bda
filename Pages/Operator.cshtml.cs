@@ -1,7 +1,6 @@
 using asset_monitoring.Services;
 using asset_monitoring.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using NLog;
 
 namespace asset_monitoring.Pages
@@ -12,14 +11,16 @@ namespace asset_monitoring.Pages
 
         private readonly PumpDashboardService _pumpDashboardService;
         private readonly ReportExportService _reportExportService;
+
+        public List<DashboardPumpDto> Pumps { get; set; } = new();
+        public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
         public string? LoggedInUserName { get; set; }
+
         public OperatorModel(PumpDashboardService pumpDashboardService, ReportExportService reportExportService)
         {
             _pumpDashboardService = pumpDashboardService;
-            _reportExportService = reportExportService;
+            _reportExportService  = reportExportService;
         }
-        public List<DashboardPumpDto> Pumps { get; set; } = new();
-        public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
 
         public async Task<IActionResult> OnGetAsync()
         {
@@ -31,14 +32,16 @@ namespace asset_monitoring.Pages
 
             if (UserType != "OPERATOR" && UserType != "ADMIN")
             {
-                Logger.Warn("OnGetAsync: unauthorized access attempt to operator page by userType={0}", UserType);
+                Logger.Warn("OnGetAsync: unauthorized access to operator page by userType={0}", UserType);
                 return RedirectToPage("/Index");
             }
 
             LoggedInUserName = Username;
             Logger.Info("OnGetAsync: operator page loaded for userId={0}, user={1}", UserId, Username);
-            Pumps = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
+
+            Pumps          = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
             RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync(UserId, UserType);
+
             Logger.Debug("OnGetAsync: loaded {0} pumps for operator userId={1}", Pumps.Count, UserId);
             return Page();
         }
@@ -63,12 +66,6 @@ namespace asset_monitoring.Pages
             }
         }
 
-        public IActionResult OnPostLogout()
-        {
-            Logger.Info("OnPostLogout: operator userId={0}, user={1} logged out", UserId, Username);
-            return LogoutAndRedirect();
-        }
-
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
             if (!IsLoggedIn || (UserType != "OPERATOR" && UserType != "ADMIN"))
@@ -85,12 +82,17 @@ namespace asset_monitoring.Pages
             return new JsonResult(users);
         }
 
-        public IActionResult OnGetDownloadReport()
+        public async Task<IActionResult> OnGetDownloadReportAsync()
         {
-            Logger.Info("OnGetDownloadReport: report download requested by operator userId={0}", UserId);
-            var allActivePumps = _pumpDashboardService.GetPumpsAsync(UserId, UserType).GetAwaiter().GetResult();
-            Logger.Info("OnGetDownloadReport: exporting {0} pumps to CSV", allActivePumps.Count);
-            return _reportExportService.ExportPumpsAsCsv(allActivePumps);
+            var pumps = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
+            Logger.Info("OnGetDownloadReport: exporting {0} pumps as CSV, operator userId={1}", pumps.Count, UserId);
+            return _reportExportService.ExportPumpsAsCsv(pumps);
+        }
+
+        public IActionResult OnPostLogout()
+        {
+            Logger.Info("OnPostLogout: operator userId={0}, user={1} logged out", UserId, Username);
+            return LogoutAndRedirect();
         }
     }
 }
