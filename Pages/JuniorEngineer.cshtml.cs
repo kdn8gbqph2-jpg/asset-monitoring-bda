@@ -41,8 +41,8 @@ namespace asset_monitoring.Pages
             LoggedInUserName = Username;
             Logger.Info("JuniorEngineer OnGetAsync: user={0}", Username);
 
-            // ADMIN sees all pumps; JE sees all pumps in read-only mode
-            Pumps = await _pumpService.GetPumpsAsync(UserId, UserType == "ADMIN" ? "ADMIN" : "OPERATOR");
+            // ADMIN sees all pumps; JE sees pumps assigned to them via je_mobile
+            Pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
             RunningSummary = await _pumpService.GetPumpRunningSummaryAsync(UserId, UserType);
 
             return Page();

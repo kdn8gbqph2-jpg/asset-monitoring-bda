@@ -105,17 +105,25 @@ namespace asset_monitoring.Services
         {
             try
             {
-                // For non-admin: look up the operator's mobile (used as operator_mobile filter key)
+                // For non-admin: look up user's mobile and route to the correct filter column
+                // OPERATOR → filter by entry.operator_mobile
+                // JE       → filter by entry.je_mobile
                 string? operatorMobile = null;
+                string? jeMobile = null;
                 if (user_type != "ADMIN" && userId.HasValue)
                 {
-                    operatorMobile = await _db.BdaUserMasters
+                    var userMobile = await _db.BdaUserMasters
                         .Where(u => u.UserId == userId.Value && u.IsActive)
                         .Select(u => u.MobileNumber)
                         .FirstOrDefaultAsync();
 
-                    Logger.Debug("FetchFromDatabaseAsync: operator mobile={0} for userId={1}",
-                        operatorMobile, userId);
+                    if (user_type == "JE")
+                        jeMobile = userMobile;
+                    else
+                        operatorMobile = userMobile;
+
+                    Logger.Debug("FetchFromDatabaseAsync: mobile={0} for userId={1}, userType={2}",
+                        userMobile, userId, user_type);
                 }
 
                 // Build a mobile→name lookup from user master (small table — cheap)
@@ -134,7 +142,9 @@ namespace asset_monitoring.Services
                     from loc   in locGroup.DefaultIfEmpty()
                     join entry in _db.PumpStatusEntries  on pump.PumpId equals entry.PumpId into entryGroup
                     from entry in entryGroup.DefaultIfEmpty()
-                    where operatorMobile == null || (entry != null && entry.OperatorMobile == operatorMobile)
+                    where (operatorMobile == null && jeMobile == null)
+                       || (operatorMobile != null && entry != null && entry.OperatorMobile == operatorMobile)
+                       || (jeMobile       != null && entry != null && entry.JeMobile       == jeMobile)
                     select new
                     {
                         pump.PumpId,
@@ -447,14 +457,20 @@ namespace asset_monitoring.Services
                 var todayStartUtc = TimeZoneInfo.ConvertTimeToUtc(nowIst.Date, ist);
                 var monthStartUtc = TimeZoneInfo.ConvertTimeToUtc(new DateTime(nowIst.Year, nowIst.Month, 1), ist);
 
-                // Operator mobile filter (mirrors FetchFromDatabaseAsync logic)
+                // Mobile filter — OPERATOR filters by operator_mobile, JE filters by je_mobile
                 string? operatorMobile = null;
+                string? jeMobile = null;
                 if (userType != "ADMIN" && userId.HasValue)
                 {
-                    operatorMobile = await _db.BdaUserMasters
+                    var userMobile = await _db.BdaUserMasters
                         .Where(u => u.UserId == userId.Value && u.IsActive)
                         .Select(u => u.MobileNumber)
                         .FirstOrDefaultAsync();
+
+                    if (userType == "JE")
+                        jeMobile = userMobile;
+                    else
+                        operatorMobile = userMobile;
                 }
 
                 // Fetch active pumps with current status entry
@@ -465,7 +481,9 @@ namespace asset_monitoring.Services
                     from loc   in lg.DefaultIfEmpty()
                     join entry in _db.PumpStatusEntries on pump.PumpId equals entry.PumpId into eg
                     from entry in eg.DefaultIfEmpty()
-                    where operatorMobile == null || (entry != null && entry.OperatorMobile == operatorMobile)
+                    where (operatorMobile == null && jeMobile == null)
+                       || (operatorMobile != null && entry != null && entry.OperatorMobile == operatorMobile)
+                       || (jeMobile       != null && entry != null && entry.JeMobile       == jeMobile)
                     select new
                     {
                         pump.PumpId,
