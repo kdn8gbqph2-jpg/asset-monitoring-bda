@@ -24,11 +24,18 @@ body {
 
 .dashboard-navbar {
     background-color: var(--primary-color);
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
 }
 
     .dashboard-navbar .navbar-brand,
     .dashboard-navbar .nav-link {
         color: #fff !important;
+    }
+
+    .dashboard-navbar .navbar-brand {
+        font-size: 1.25rem;
+        pointer-events: none; /* title bar — not a clickable link */
     }
 
         .dashboard-navbar .nav-link:hover {
