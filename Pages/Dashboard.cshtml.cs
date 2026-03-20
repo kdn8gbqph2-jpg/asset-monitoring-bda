@@ -243,21 +243,18 @@ namespace asset_monitoring.Pages
         // ── Report downloads — require login ─────────────────────────────────
         public async Task<IActionResult> OnGetDownloadReportAsync()
         {
-            if (!IsLoggedIn) return RedirectToPage("/Index");
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsCsv(pumps);
         }
 
         public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
         {
-            if (!IsLoggedIn) return RedirectToPage("/Index");
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsXlsx(pumps);
         }
 
         public async Task<IActionResult> OnGetDownloadReportPdfAsync()
         {
-            if (!IsLoggedIn) return RedirectToPage("/Index");
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
