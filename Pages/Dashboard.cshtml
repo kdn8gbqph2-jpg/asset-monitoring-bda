@@ -78,9 +78,6 @@
         </div>
         <div class="d-flex align-items-center gap-3">
             <span id="lastUpdatedLabel" class="small text-muted fst-italic">Just now</span>
-            <div id="activeFiltersBar" class="d-none small text-muted fst-italic">
-                <!-- shows active filter / sort hints -->
-            </div>
         </div>
     </div>
 
@@ -107,15 +104,7 @@
                             <th class="sortable" data-col="5" data-type="str">JE Name <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="6" data-type="str">JE Mobile <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="7" data-type="num">Running <span class="sort-icon">⇅</span></th>
-                            <th class="th-filter col-sticky-right" id="thStatus" data-col="8" style="position:relative;">
-                                Status <span class="filter-icon">▾</span>
-                                <div class="status-dropdown" id="statusDropdown">
-                                    <div class="status-dropdown-item" data-val="">All</div>
-                                    <div class="status-dropdown-item" data-val="ON">🟢 ON</div>
-                                    <div class="status-dropdown-item" data-val="OFF">🔴 OFF</div>
-                                    <div class="status-dropdown-item" data-val="MAINTENANCE">🟡 MAINTENANCE</div>
-                                </div>
-                            </th>
+                            <th class="col-sticky-right sortable" data-col="8" data-type="str">Status <span class="sort-icon">⇅</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -389,7 +378,6 @@
         const btnMap          = document.getElementById('btnMap');
         const btnList         = document.getElementById('btnList');
         const btnReset        = document.getElementById('btnReset');
-        const activeFiltersBar = document.getElementById('activeFiltersBar');
 
         let currentView = null; // 'map' | 'list' | null
 
@@ -448,23 +436,9 @@
                 if (icon) icon.textContent = '⇅';
             });
 
-            // 3. Reset status filter — show all rows
+            // 3. Show all rows (in case sort hid any)
             document.querySelectorAll('.table-dashboard tbody tr')
                 .forEach(tr => tr.style.display = '');
-
-            // Reset filter header icon + selection highlight
-            const thStatus  = document.getElementById('thStatus');
-            const dropdown  = document.getElementById('statusDropdown');
-            if (thStatus) {
-                const filterIcon = thStatus.querySelector('.filter-icon');
-                if (filterIcon) filterIcon.textContent = '▾';
-                thStatus.classList.remove('filter-active');
-            }
-            if (dropdown) {
-                dropdown.querySelectorAll('.status-dropdown-item')
-                    .forEach(i => i.classList.remove('selected'));
-                dropdown.classList.remove('open');
-            }
 
             // 4. Spin the reset icon for visual feedback
             const icon = btnReset.querySelector('i');
@@ -474,10 +448,6 @@
                 icon.style.transition = '';
                 icon.style.transform  = '';
             }, 500);
-
-            // 5. Hide filters bar hint
-            activeFiltersBar.classList.add('d-none');
-            activeFiltersBar.textContent = '';
         }
     </script>
 
@@ -606,47 +576,6 @@
                 });
         }
 
-        // ── Status filter dropdown ───────────────────────────────────────────
-        (function () {
-            const thStatus      = document.getElementById('thStatus');
-            const dropdown      = document.getElementById('statusDropdown');
-            let   activeFilter  = '';
-
-            // Toggle dropdown open/close
-            thStatus.addEventListener('click', e => {
-                e.stopPropagation();
-                dropdown.classList.toggle('open');
-            });
-
-            // Close on outside click
-            document.addEventListener('click', () => dropdown.classList.remove('open'));
-
-            // Handle item selection
-            dropdown.querySelectorAll('.status-dropdown-item').forEach(item => {
-                item.addEventListener('click', e => {
-                    e.stopPropagation();
-                    activeFilter = item.dataset.val;
-
-                    // Highlight selected item
-                    dropdown.querySelectorAll('.status-dropdown-item')
-                        .forEach(i => i.classList.remove('selected'));
-                    item.classList.add('selected');
-
-                    // Update header icon to show active filter
-                    thStatus.querySelector('.filter-icon').textContent =
-                        activeFilter ? '▾●' : '▾';
-                    thStatus.classList.toggle('filter-active', !!activeFilter);
-
-                    // Filter rows
-                    document.querySelectorAll('.table-dashboard tbody tr').forEach(tr => {
-                        const status = tr.cells[8].textContent.trim();
-                        tr.style.display = (!activeFilter || status === activeFilter) ? '' : 'none';
-                    });
-
-                    dropdown.classList.remove('open');
-                });
-            });
-        })();
 
         // ── Column resize handles ────────────────────────────────────────────
         (function() {
