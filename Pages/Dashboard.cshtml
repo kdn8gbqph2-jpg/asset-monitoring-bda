@@ -248,7 +248,9 @@
                     </div>
                     @if (Model.LoginMessage != null)
                     {
-                        <div class="alert alert-info">@Model.LoginMessage</div>
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@Model.LoginMessage
+                        </div>
                     }
                 </div>
                 <div class="modal-footer">
@@ -263,6 +265,15 @@
 @section Scripts {
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    @if (Model.LoginMessage != null)
+    {
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                var loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+                loginModal.show();
+            });
+        </script>
+    }
     <script>
         let map;
         let markersLayer;
