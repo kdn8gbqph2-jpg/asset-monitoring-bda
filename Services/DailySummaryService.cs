@@ -145,44 +145,49 @@ namespace asset_monitoring.Services
             PumpStatus? lastStatus  = null;
 
             // ── Step 1: Determine starting status at dayStart ────────────────
-            // Find the most recent log entry that ended ON or BEFORE dayStart
-            // Its NewStatus tells us what the pump was set to before this day began
-            var lastLogBeforeDay = allPumpLogs
+            // We check BOTH completed logs and ongoing sessions, then pick whichever
+            // represents the most recent transition before the day started.
+
+            // a) Most recent completed log before day start (transition at EndTime)
+            var lastCompletedLog = allPumpLogs
                 .Where(l => l.EndTime.HasValue && l.EndTime.Value <= dayStartUtc)
                 .OrderByDescending(l => l.EndTime)
+                .ThenByDescending(l => l.RowInsertionDateTime)
+                .FirstOrDefault();
+
+            // b) Most recent ongoing log (EndTime=NULL) created before day start
+            //    These are status changes where EndTime was not recorded (e.g. legacy bug).
+            //    The transition happened at RowInsertionDateTime.
+            var lastOngoingLog = allPumpLogs
+                .Where(l => !l.EndTime.HasValue && l.RowInsertionDateTime <= dayStartUtc)
+                .OrderByDescending(l => l.RowInsertionDateTime)
                 .FirstOrDefault();
 
             PumpStatus? statusAtDayStart = null;
 
-            if (lastLogBeforeDay != null)
+            if (lastCompletedLog != null && lastOngoingLog != null)
             {
-                // The pump was changed to this status before today
-                statusAtDayStart = lastLogBeforeDay.NewStatus;
+                // Pick the later transition: completed log transitioned at EndTime,
+                // ongoing log transitioned at RowInsertionDateTime.
+                // Use >= so that ongoing logs win ties (they represent the later state).
+                statusAtDayStart = lastOngoingLog.RowInsertionDateTime >= lastCompletedLog.EndTime!.Value
+                    ? lastOngoingLog.NewStatus
+                    : lastCompletedLog.NewStatus;
             }
-            else
+            else if (lastCompletedLog != null)
             {
-                // No log entry ended before this day. Two possibilities:
-                // a) There's an ongoing session that started before this day (log with StartTime but no EndTime)
-                // b) Pump has never changed status — use current status from pump_status_tbl
-                var ongoingBeforeDay = allPumpLogs
-                    .Where(l => l.StartTime.HasValue
-                             && l.StartTime.Value <= dayStartUtc
-                             && !l.EndTime.HasValue)
-                    .OrderByDescending(l => l.StartTime)
-                    .FirstOrDefault();
-
-                if (ongoingBeforeDay != null)
-                {
-                    // Pump was in OldStatus since before this day (session still running)
-                    statusAtDayStart = ongoingBeforeDay.OldStatus ?? ongoingBeforeDay.NewStatus;
-                }
-                else if (currentEntry != null)
-                {
-                    // Pump never had a status change, use whatever it is now
-                    statusAtDayStart = currentEntry.Status;
-                }
-                // else: pump has no status info at all — leave as null
+                statusAtDayStart = lastCompletedLog.NewStatus;
             }
+            else if (lastOngoingLog != null)
+            {
+                statusAtDayStart = lastOngoingLog.NewStatus;
+            }
+            else if (currentEntry != null)
+            {
+                // Pump never had a status change — use current status from pump_status_tbl
+                statusAtDayStart = currentEntry.Status;
+            }
+            // else: pump has no status info at all — leave as null
 
             // ── Step 2: Collect status change events within the day ───────────
             // A "change event" = a log entry whose EndTime falls within [dayStart, dayEnd)

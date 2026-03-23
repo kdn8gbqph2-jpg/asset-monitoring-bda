@@ -309,7 +309,7 @@ namespace asset_monitoring.Services
                             OldStatus            = oldStatus,
                             NewStatus            = newStatus,
                             StartTime            = entry.CurrentStartTime,
-                            EndTime              = newStatus != PumpStatus.On ? now : null,
+                            EndTime              = now,
                             Remarks              = req.Remarks,
                             UpdatedBy            = req.UpdatedBy,
                             RowInsertionDateTime = now,
