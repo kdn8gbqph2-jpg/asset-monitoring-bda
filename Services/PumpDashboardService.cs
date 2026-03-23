@@ -58,11 +58,24 @@ namespace asset_monitoring.Services
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById(
+            OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+
         private readonly ApplicationDbContext _db;
         private readonly IMemoryCache _cache;
         private readonly DailySummaryService _dailySummary;
 
         private const string ADMIN_CACHE_KEY = "PUMP_DASHBOARD_ADMIN";
+
+        /// <summary>
+        /// Ensure DateTime has Kind=Utc so System.Text.Json adds "Z" suffix.
+        /// The browser's toLocaleString() then converts UTC → user's local timezone.
+        /// </summary>
+        private static DateTime? AsUtc(DateTime? dt)
+            => dt.HasValue ? DateTime.SpecifyKind(dt.Value, DateTimeKind.Utc) : null;
+
+        private static DateTime AsUtc(DateTime dt)
+            => DateTime.SpecifyKind(dt, DateTimeKind.Utc);
 
         public PumpDashboardService(ApplicationDbContext db, IMemoryCache cache, DailySummaryService dailySummary)
         {
@@ -186,7 +199,7 @@ namespace asset_monitoring.Services
                     RunningMinutes  = r.EntryStatus == PumpStatus.On && r.CurrentStartTime.HasValue
                         ? (int)(DateTime.UtcNow - r.CurrentStartTime.Value).TotalMinutes
                         : 0,
-                    LastUpdated     = r.LastUpdated,
+                    LastUpdated     = AsUtc(r.LastUpdated),
                     OperatorMobile  = r.OperatorMobile,
                     OperatorName    = r.OperatorMobile != null && userMap.TryGetValue(r.OperatorMobile, out var opN) ? opN : null,
                     JeMobile        = r.JeMobile,
@@ -349,9 +362,7 @@ namespace asset_monitoring.Services
                 {
                     try
                     {
-                        var ist = TimeZoneInfo.FindSystemTimeZoneById(
-                            OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
-                        var todayIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ist).Date;
+                        var todayIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Ist).Date;
                         await _dailySummary.BuildSummaryForDateAsync(todayIst);
                     }
                     catch (Exception ex)
@@ -387,8 +398,8 @@ namespace asset_monitoring.Services
                     OldStatus       = l.OldStatus.HasValue
                                         ? StatusLabel(l.OldStatus.Value) : "-",
                     NewStatus       = StatusLabel(l.NewStatus),
-                    StartTime       = l.StartTime,
-                    EndTime         = l.EndTime,
+                    StartTime       = AsUtc(l.StartTime),
+                    EndTime         = AsUtc(l.EndTime),
                     DurationMinutes = l.StartTime.HasValue && l.EndTime.HasValue
                                         ? (int)(l.EndTime.Value - l.StartTime.Value).TotalMinutes
                                         : null,
@@ -465,9 +476,7 @@ namespace asset_monitoring.Services
             try
             {
                 var nowUtc = DateTime.UtcNow;
-                var ist = TimeZoneInfo.FindSystemTimeZoneById(
-                    OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
-                var nowIst    = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, ist);
+                var nowIst    = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, Ist);
                 var todayIst  = nowIst.Date;
                 var monthStartIst = new DateTime(nowIst.Year, nowIst.Month, 1);
 
@@ -563,7 +572,7 @@ namespace asset_monitoring.Services
                         MonthRunMinutes          = Math.Max(0, monthOn),
                         MonthOffMinutes          = Math.Max(0, monthOff),
                         MonthMaintenanceMinutes  = Math.Max(0, monthMnt),
-                        LastUpdated              = p.LastUpdated,
+                        LastUpdated              = AsUtc(p.LastUpdated),
                         OperatorName             = p.OperatorMobile != null && nameDict.TryGetValue(p.OperatorMobile, out var opN) ? opN : null,
                     };
                 }).ToList();

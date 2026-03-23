@@ -149,10 +149,14 @@ namespace asset_monitoring.Services
             // represents the most recent transition before the day started.
 
             // a) Most recent completed log before day start (transition at EndTime)
+            //    Tiebreakers: RowInsertionDateTime, then StartTime (in a chain of
+            //    transitions, each log's StartTime = previous log's EndTime, so the
+            //    log with the latest StartTime is the most recent transition).
             var lastCompletedLog = allPumpLogs
                 .Where(l => l.EndTime.HasValue && l.EndTime.Value <= dayStartUtc)
                 .OrderByDescending(l => l.EndTime)
                 .ThenByDescending(l => l.RowInsertionDateTime)
+                .ThenByDescending(l => l.StartTime)
                 .FirstOrDefault();
 
             // b) Most recent ongoing log (EndTime=NULL) created before day start
