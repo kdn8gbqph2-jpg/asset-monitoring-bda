@@ -72,14 +72,33 @@ namespace asset_monitoring.Pages
                 return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
 
             Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by operator userId={1}", id, UserId);
-            await _pumpDashboardService.DeletePumpAsync(id);
-            return RedirectToPage();
+            try
+            {
+                await _pumpDashboardService.DeletePumpAsync(id);
+                return RedirectToPage();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostDeletePumpAsync failed for pumpId={0}", id);
+                return new JsonResult(new { success = false, message = "Delete failed" }) { StatusCode = 500 };
+            }
         }
 
         public async Task<JsonResult> OnGetActiveUsersAsync()
         {
-            var users = await _pumpDashboardService.GetActiveUsersForDrawerAsync();
-            return new JsonResult(users);
+            if (!IsLoggedIn || (UserType != "OPERATOR" && UserType != "ADMIN"))
+                return new JsonResult(new { success = false, message = "Unauthorized" });
+
+            try
+            {
+                var users = await _pumpDashboardService.GetActiveUsersForDrawerAsync();
+                return new JsonResult(users);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Operator OnGetActiveUsersAsync failed");
+                return new JsonResult(new { success = false, message = "Failed to load users" });
+            }
         }
 
         public async Task<IActionResult> OnGetDownloadReportAsync()

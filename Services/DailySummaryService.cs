@@ -272,24 +272,32 @@ namespace asset_monitoring.Services
         public async Task<bool> HasIncompleteSummaryAsync(DateTime istDate)
         {
             var date = istDate.Date;
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-            var activePumpCount = await db.BdaPumpMasters.CountAsync(p => p.IsActive);
-            var summaries = await db.PumpDailySummaries
-                .Where(s => s.SummaryDate == date)
-                .ToListAsync();
-
-            // Missing entirely or missing some pumps
-            if (summaries.Count < activePumpCount)
-                return true;
-
-            // Check if any summary has total != 1440 (partial day)
-            return summaries.Any(s =>
+            try
             {
-                var total = s.OnMinutes + s.OffMinutes + s.MaintenanceMinutes;
-                return total < 1438; // Allow 2-min rounding tolerance
-            });
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var activePumpCount = await db.BdaPumpMasters.CountAsync(p => p.IsActive);
+                var summaries = await db.PumpDailySummaries
+                    .Where(s => s.SummaryDate == date)
+                    .ToListAsync();
+
+                // Missing entirely or missing some pumps
+                if (summaries.Count < activePumpCount)
+                    return true;
+
+                // Check if any summary has total != 1440 (partial day)
+                return summaries.Any(s =>
+                {
+                    var total = s.OnMinutes + s.OffMinutes + s.MaintenanceMinutes;
+                    return total < 1438; // Allow 2-min rounding tolerance
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "HasIncompleteSummaryAsync failed for date={0:yyyy-MM-dd}", date);
+                return false; // Don't retry on error — will be caught next startup
+            }
         }
 
         /// <summary>

@@ -72,8 +72,19 @@ namespace asset_monitoring.Pages
 
         public async Task<JsonResult> OnGetActiveUsersAsync()
         {
-            var users = await _pumpService.GetActiveUsersForDrawerAsync();
-            return new JsonResult(users);
+            if (!IsLoggedIn || (UserType != "JE" && UserType != "ADMIN"))
+                return new JsonResult(new { success = false, message = "Unauthorized" });
+
+            try
+            {
+                var users = await _pumpService.GetActiveUsersForDrawerAsync();
+                return new JsonResult(users);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JuniorEngineer OnGetActiveUsersAsync failed");
+                return new JsonResult(new { success = false, message = "Failed to load users" });
+            }
         }
 
         public IActionResult OnPostLogout()
@@ -84,20 +95,50 @@ namespace asset_monitoring.Pages
 
         public async Task<IActionResult> OnGetDownloadReportAsync()
         {
-            var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
-            return _reportExportService.ExportPumpsAsCsv(pumps);
+            if (!IsLoggedIn) return RedirectToPage("/Index");
+            try
+            {
+                var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
+                Logger.Info("JE OnGetDownloadReportAsync: exporting {0} pumps as CSV", pumps.Count);
+                return _reportExportService.ExportPumpsAsCsv(pumps);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JE OnGetDownloadReportAsync failed");
+                return StatusCode(500, "Failed to generate report");
+            }
         }
 
         public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
         {
-            var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
-            return _reportExportService.ExportPumpsAsXlsx(pumps);
+            if (!IsLoggedIn) return RedirectToPage("/Index");
+            try
+            {
+                var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
+                Logger.Info("JE OnGetDownloadReportXlsxAsync: exporting {0} pumps as XLSX", pumps.Count);
+                return _reportExportService.ExportPumpsAsXlsx(pumps);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JE OnGetDownloadReportXlsxAsync failed");
+                return StatusCode(500, "Failed to generate report");
+            }
         }
 
         public async Task<IActionResult> OnGetDownloadReportPdfAsync()
         {
-            var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
-            return _reportExportService.ExportPumpsAsPdf(pumps);
+            if (!IsLoggedIn) return RedirectToPage("/Index");
+            try
+            {
+                var pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
+                Logger.Info("JE OnGetDownloadReportPdfAsync: exporting {0} pumps as PDF", pumps.Count);
+                return _reportExportService.ExportPumpsAsPdf(pumps);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JE OnGetDownloadReportPdfAsync failed");
+                return StatusCode(500, "Failed to generate report");
+            }
         }
     }
 }

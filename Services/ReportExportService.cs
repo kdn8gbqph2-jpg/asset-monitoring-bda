@@ -2,22 +2,16 @@ using System.Text;
 using asset_monitoring.Models;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
+using NLog;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using NLog;
 
 namespace asset_monitoring.Services
 {
     public class ReportExportService
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
-        static ReportExportService()
-        {
-            // Community licence — free for open-source / internal tools
-            QuestPDF.Settings.License = LicenseType.Community;
-        }
 
         // ── CSV ──────────────────────────────────────────────────────────────
         public FileContentResult ExportPumpsAsCsv(List<DashboardPumpDto> pumps)
@@ -28,7 +22,7 @@ namespace asset_monitoring.Services
             sb.AppendLine("PumpId,VendorName,Location,OperatorName,OperatorMobile,JEName,JEMobile,Status,RunningMinutes,LastUpdated");
             foreach (var p in pumps)
             {
-                sb.AppendLine($"{p.PumpId},{p.VendorName},{p.Location},{p.OperatorName},{p.OperatorMobile},{p.JeName},{p.JeMobile},{p.Status},{p.RunningMinutes},{p.LastUpdated:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine($"{CsvEscape(p.PumpId)},{CsvEscape(p.VendorName)},{CsvEscape(p.Location)},{CsvEscape(p.OperatorName)},{CsvEscape(p.OperatorMobile)},{CsvEscape(p.JeName)},{CsvEscape(p.JeMobile)},{CsvEscape(p.Status)},{p.RunningMinutes},{p.LastUpdated:yyyy-MM-dd HH:mm:ss}");
             }
 
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());

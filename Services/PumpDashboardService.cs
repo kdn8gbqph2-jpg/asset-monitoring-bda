@@ -28,7 +28,6 @@ namespace asset_monitoring.Services
         public string VendorName { get; set; } = "";
         public string? Category { get; set; }
         public string LocationName { get; set; } = "";
-        public string Status { get; set; } = "OFF";
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
         public string? OperatorMobile { get; set; }
@@ -86,7 +85,7 @@ namespace asset_monitoring.Services
         {
             if (user_type == "ADMIN")
             {
-                if (_cache.TryGetValue(ADMIN_CACHE_KEY, out List<DashboardPumpDto> cached))
+                if (_cache.TryGetValue(ADMIN_CACHE_KEY, out List<DashboardPumpDto>? cached) && cached != null)
                 {
                     Logger.Debug("GetPumpsAsync: cache hit — {0} pumps for ADMIN", cached.Count);
                     return cached;
@@ -436,18 +435,26 @@ namespace asset_monitoring.Services
         // ── Get active operators and JEs for pump drawer dropdowns ────────────
         public async Task<List<UserSelectionDto>> GetActiveUsersForDrawerAsync()
         {
-            return await _db.BdaUserMasters
-                .Where(u => u.IsActive && u.MobileNumber != null &&
-                       (u.UserType == BdaUserType.OPERATOR || u.UserType == BdaUserType.JE))
-                .AsNoTracking()
-                .OrderBy(u => u.UserType).ThenBy(u => u.Name)
-                .Select(u => new UserSelectionDto
-                {
-                    Mobile   = u.MobileNumber!,
-                    Name     = u.Name ?? u.MobileNumber!,
-                    UserType = u.UserType.ToString()
-                })
-                .ToListAsync();
+            try
+            {
+                return await _db.BdaUserMasters
+                    .Where(u => u.IsActive && u.MobileNumber != null &&
+                           (u.UserType == BdaUserType.OPERATOR || u.UserType == BdaUserType.JE))
+                    .AsNoTracking()
+                    .OrderBy(u => u.UserType).ThenBy(u => u.Name)
+                    .Select(u => new UserSelectionDto
+                    {
+                        Mobile   = u.MobileNumber!,
+                        Name     = u.Name ?? u.MobileNumber!,
+                        UserType = u.UserType.HasValue ? u.UserType.Value.ToString() : ""
+                    })
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "GetActiveUsersForDrawerAsync failed");
+                return new List<UserSelectionDto>();
+            }
         }
 
         // ── Pump Running Summary (today + this month run hours per pump) ──────
@@ -641,14 +648,10 @@ namespace asset_monitoring.Services
         public string? Status { get; set; }
         public int RunningMinutes { get; set; }
         public DateTime LastUpdated { get; set; }
-        // Operator
         public string? OperatorName { get; set; }
         public string? OperatorMobile { get; set; }
-        // Junior Engineer
         public string? JeName { get; set; }
         public string? JeMobile { get; set; }
-        /// <summary>Kept for backward compat — same as OperatorMobile.</summary>
-        public string? MobileNumber => OperatorMobile;
     }
 
     public class UserSelectionDto

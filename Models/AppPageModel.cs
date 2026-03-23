@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace asset_monitoring.Models
+
 {
     public abstract class AppPageModel : PageModel
     {
@@ -21,14 +22,6 @@ namespace asset_monitoring.Models
         {
             HttpContext.Session.Clear();
             return RedirectToPage("/Index");
-        }
-
-        protected void RequireLogin()
-        {
-            if (!IsLoggedIn)
-            {
-                Response.Redirect("/Index");
-            }
         }
     }
 }

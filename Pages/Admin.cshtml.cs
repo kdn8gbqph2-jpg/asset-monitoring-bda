@@ -2,10 +2,8 @@ using asset_monitoring.Data;
 using asset_monitoring.Models;
 using asset_monitoring.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using NLog;
-using BCrypt.Net;
 
 namespace asset_monitoring.Pages
 {
@@ -18,7 +16,11 @@ namespace asset_monitoring.Pages
         private readonly PumpDashboardService _pumpDashboardService;
         private readonly ReportExportService _reportExportService;
 
-        public AdminModel(ApplicationDbContext context, UserCacheService userCache, PumpDashboardService pumpDashboardService, ReportExportService reportExportService)
+        public AdminModel(
+            ApplicationDbContext context,
+            UserCacheService userCache,
+            PumpDashboardService pumpDashboardService,
+            ReportExportService reportExportService)
         {
             _context = context;
             _userCache = userCache;
@@ -26,6 +28,7 @@ namespace asset_monitoring.Pages
             _reportExportService = reportExportService;
         }
 
+        // ── Page properties ─────────────────────────────────────────────────
         public List<BdaUserMaster> Users { get; set; } = new();
         public List<DashboardPumpDto> Pumps { get; set; } = new();
         public List<BdaPumpLocation> Locations { get; set; } = new();
@@ -36,24 +39,20 @@ namespace asset_monitoring.Pages
         public bool IsAdmin { get; set; }
         public string? LoggedInUserName { get; set; }
 
+        // ═════════════════════════════════════════════════════════════════════
+        //  PAGE LOAD
+        // ═════════════════════════════════════════════════════════════════════
+
         public async Task<IActionResult> OnGetAsync()
         {
-            if (!IsLoggedIn)
+            if (!IsLoggedIn || UserType != "ADMIN")
             {
-                Logger.Warn("OnGetAsync: unauthenticated access attempt to admin page");
+                Logger.Warn("OnGetAsync: unauthorized access attempt, user={0}, type={1}", Username, UserType);
                 return RedirectToPage("/Index");
             }
 
-            var userType = HttpContext.Session.GetString("UserType");
-            IsAdmin = userType == "ADMIN";
+            IsAdmin = true;
             LoggedInUserName = Username;
-
-            if (!IsAdmin)
-            {
-                Logger.Warn("OnGetAsync: non-admin access attempt by user={0}, userType={1}", Username, userType);
-                return RedirectToPage("/Index");
-            }
-
             Logger.Info("OnGetAsync: admin page loaded by user={0}", Username);
 
             Users = await _context.BdaUserMasters
@@ -61,7 +60,6 @@ namespace asset_monitoring.Pages
                 .Where(u => u.IsActive)
                 .ToListAsync();
 
-            // No username filter for admin: fetch all active pumps with mobile number
             Pumps = await _pumpDashboardService.GetPumpsAsync();
             RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync();
 
@@ -69,27 +67,27 @@ namespace asset_monitoring.Pages
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Load complaints (newest first)
             Complaints = await _context.ComplaintLogs
                 .AsNoTracking()
                 .OrderByDescending(c => c.RowInsertionDateTime)
                 .ToListAsync();
             OpenComplaintCount = Complaints.Count(c => c.Status == "OPEN");
 
-            // Load app settings
             var configs = await _context.AppConfigs.AsNoTracking().ToListAsync();
             AppSettings = configs.ToDictionary(c => c.ConfigKey, c => c.ConfigValue ?? "");
 
-            Logger.Debug("OnGetAsync: loaded {0} users, {1} pumps, {2} complaints for admin", Users.Count, Pumps.Count, Complaints.Count);
+            Logger.Debug("OnGetAsync: loaded {0} users, {1} pumps, {2} complaints", Users.Count, Pumps.Count, Complaints.Count);
             return Page();
         }
 
-        // ── Pump handlers ────────────────────────────────────────────────────
+        // ═════════════════════════════════════════════════════════════════════
+        //  PUMP HANDLERS
+        // ═════════════════════════════════════════════════════════════════════
 
         public async Task<IActionResult> OnPostUpdatePumpAsync([FromBody] UpdatePumpRequest req)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
             Logger.Info("OnPostUpdatePumpAsync: pumpId={0} by admin={1}", req.PumpId, Username);
             try
@@ -109,9 +107,9 @@ namespace asset_monitoring.Pages
         public async Task<IActionResult> OnPostAddPumpAsync([FromBody] AddPumpRequest req)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
-            Logger.Info("OnPostAddPumpAsync: vendor={0}, location={1} by admin={2}", req.VendorName, req.LocationName, Username);
+            Logger.Info("OnPostAddPumpAsync: vendor={0}, location={1}", req.VendorName, req.LocationName);
             try
             {
                 req.UpdatedBy = Username;
@@ -129,19 +127,21 @@ namespace asset_monitoring.Pages
         public async Task<IActionResult> OnPostDeletePumpAsync(int id)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
             Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by admin={1}", id, Username);
             await _pumpDashboardService.DeletePumpAsync(id);
             return RedirectToPage();
         }
 
-        // ── User handlers ────────────────────────────────────────────────────
+        // ═════════════════════════════════════════════════════════════════════
+        //  USER HANDLERS
+        // ═════════════════════════════════════════════════════════════════════
 
         public async Task<IActionResult> OnPostUpdateUserAsync([FromBody] EditUserInputModel req)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
             if (req == null || req.UserId <= 0)
             {
@@ -149,13 +149,11 @@ namespace asset_monitoring.Pages
                 return new JsonResult(new { success = false, message = "Invalid input" });
             }
 
-            // Input length validation
             if ((req.Name?.Length ?? 0) > 100 || (req.Username?.Length ?? 0) > 50 ||
                 (req.MobileNumber?.Length ?? 0) > 20)
                 return new JsonResult(new { success = false, message = "Input exceeds maximum length" });
 
-            Logger.Info("OnPostUpdateUserAsync: userId={0}, userType={1} by admin={2}", req.UserId, req.UserType, Username);
-
+            Logger.Info("OnPostUpdateUserAsync: userId={0}, userType={1}", req.UserId, req.UserType);
             try
             {
                 var user = await _context.BdaUserMasters.FindAsync(req.UserId);
@@ -178,8 +176,7 @@ namespace asset_monitoring.Pages
 
                 await _context.SaveChangesAsync();
                 _userCache.Reload();
-
-                Logger.Info("OnPostUpdateUserAsync: userId={0} updated, cache reloaded", req.UserId);
+                Logger.Info("OnPostUpdateUserAsync: userId={0} updated", req.UserId);
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
@@ -192,23 +189,21 @@ namespace asset_monitoring.Pages
         public async Task<IActionResult> OnPostAddUserAsync([FromBody] EditUserInputModel req)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
-            if (req == null || string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.MobileNumber) || string.IsNullOrWhiteSpace(req.Username))
+            if (req == null || string.IsNullOrWhiteSpace(req.Name) ||
+                string.IsNullOrWhiteSpace(req.MobileNumber) || string.IsNullOrWhiteSpace(req.Username))
             {
-                Logger.Warn("OnPostAddUserAsync: missing required fields");
                 return new JsonResult(new { success = false, message = "Name, Username and Mobile are required" });
             }
 
-            // Input length validation
             if (req.Name.Length > 100 || req.Username.Length > 50 || req.MobileNumber.Length > 20)
                 return new JsonResult(new { success = false, message = "Input exceeds maximum length" });
 
             if (string.IsNullOrWhiteSpace(req.Password) || req.Password.Length < 6)
                 return new JsonResult(new { success = false, message = "Password must be at least 6 characters" });
 
-            Logger.Info("OnPostAddUserAsync: name={0}, userType={1} by admin={2}", req.Name, req.UserType, Username);
-
+            Logger.Info("OnPostAddUserAsync: name={0}, userType={1}", req.Name, req.UserType);
             try
             {
                 var now = DateTime.UtcNow;
@@ -216,16 +211,15 @@ namespace asset_monitoring.Pages
 
                 var user = new BdaUserMaster
                 {
-                    Name = req.Name,
-                    Username = req.Username,
-                    UserType = parsedType,
-                    MobileNumber = req.MobileNumber,
-                    Password = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 12),
-                    IsActive = true,
+                    Name                 = req.Name,
+                    Username             = req.Username,
+                    UserType             = parsedType,
+                    MobileNumber         = req.MobileNumber,
+                    Password             = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 12),
+                    IsActive             = true,
                     RowInsertionDateTime = now,
-                    RowUpdationDateTime = now
+                    RowUpdationDateTime  = now
                 };
-
                 _context.BdaUserMasters.Add(user);
                 await _context.SaveChangesAsync();
                 _userCache.Reload();
@@ -243,24 +237,21 @@ namespace asset_monitoring.Pages
         public async Task<IActionResult> OnPostDeleteUserAsync(int id)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
-            Logger.Info("OnPostDeleteUserAsync: deactivating userId={0} by admin={1}", id, Username);
+            Logger.Info("OnPostDeleteUserAsync: deactivating userId={0}", id);
             try
             {
                 var user = await _context.BdaUserMasters.FindAsync(id);
                 if (user == null)
-                {
-                    Logger.Warn("OnPostDeleteUserAsync: userId={0} not found", id);
                     return new JsonResult(new { success = false, message = "User not found" });
-                }
 
                 user.IsActive = false;
                 user.RowUpdationDateTime = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 _userCache.Reload();
 
-                Logger.Info("OnPostDeleteUserAsync: userId={0} deactivated, cache reloaded", id);
+                Logger.Info("OnPostDeleteUserAsync: userId={0} deactivated", id);
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
@@ -272,96 +263,118 @@ namespace asset_monitoring.Pages
 
         public async Task<JsonResult> OnGetActiveUsersAsync()
         {
-            var users = await _pumpDashboardService.GetActiveUsersForDrawerAsync();
-            return new JsonResult(users);
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" });
+
+            try
+            {
+                var users = await _pumpDashboardService.GetActiveUsersForDrawerAsync();
+                return new JsonResult(users);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnGetActiveUsersAsync failed");
+                return new JsonResult(new { success = false, message = "Failed to load users" });
+            }
         }
 
-        public async Task<IActionResult> OnGetDownloadReportAsync()
+        // ═════════════════════════════════════════════════════════════════════
+        //  REPORT DOWNLOADS (pumps + complaints × 3 formats)
+        // ═════════════════════════════════════════════════════════════════════
+
+        public async Task<IActionResult> OnGetDownloadReportAsync()       => await ExportPumps("CSV");
+        public async Task<IActionResult> OnGetDownloadReportXlsxAsync()   => await ExportPumps("XLSX");
+        public async Task<IActionResult> OnGetDownloadReportPdfAsync()    => await ExportPumps("PDF");
+
+        public async Task<IActionResult> OnGetDownloadComplaintsCsvAsync()  => await ExportComplaints("CSV");
+        public async Task<IActionResult> OnGetDownloadComplaintsXlsxAsync() => await ExportComplaints("XLSX");
+        public async Task<IActionResult> OnGetDownloadComplaintsPdfAsync()  => await ExportComplaints("PDF");
+
+        private async Task<IActionResult> ExportPumps(string format)
         {
-            var pumps = await _pumpDashboardService.GetPumpsAsync();
-            Logger.Info("OnGetDownloadReport: exporting {0} pumps as CSV, admin={1}", pumps.Count, Username);
-            return _reportExportService.ExportPumpsAsCsv(pumps);
+            if (!IsLoggedIn || UserType != "ADMIN") return RedirectToPage("/Index");
+            try
+            {
+                var pumps = await _pumpDashboardService.GetPumpsAsync();
+                Logger.Info("ExportPumps({0}): {1} pumps, admin={2}", format, pumps.Count, Username);
+                return format switch
+                {
+                    "XLSX" => _reportExportService.ExportPumpsAsXlsx(pumps),
+                    "PDF"  => _reportExportService.ExportPumpsAsPdf(pumps),
+                    _      => _reportExportService.ExportPumpsAsCsv(pumps),
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "ExportPumps({0}) failed", format);
+                return StatusCode(500, $"Failed to generate {format} report");
+            }
         }
 
-        public async Task<IActionResult> OnGetDownloadReportXlsxAsync()
+        private async Task<IActionResult> ExportComplaints(string format)
         {
-            var pumps = await _pumpDashboardService.GetPumpsAsync();
-            Logger.Info("OnGetDownloadReportXlsx: exporting {0} pumps as XLSX, admin={1}", pumps.Count, Username);
-            return _reportExportService.ExportPumpsAsXlsx(pumps);
+            if (!IsLoggedIn || UserType != "ADMIN") return RedirectToPage("/Index");
+            try
+            {
+                var complaints = await _context.ComplaintLogs.AsNoTracking()
+                    .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
+                Logger.Info("ExportComplaints({0}): {1} complaints, admin={2}", format, complaints.Count, Username);
+                return format switch
+                {
+                    "XLSX" => _reportExportService.ExportComplaintsAsXlsx(complaints),
+                    "PDF"  => _reportExportService.ExportComplaintsAsPdf(complaints),
+                    _      => _reportExportService.ExportComplaintsAsCsv(complaints),
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "ExportComplaints({0}) failed", format);
+                return StatusCode(500, $"Failed to generate complaint {format}");
+            }
         }
 
-        public async Task<IActionResult> OnGetDownloadReportPdfAsync()
-        {
-            var pumps = await _pumpDashboardService.GetPumpsAsync();
-            Logger.Info("OnGetDownloadReportPdf: exporting {0} pumps as PDF, admin={1}", pumps.Count, Username);
-            return _reportExportService.ExportPumpsAsPdf(pumps);
-        }
+        // ═════════════════════════════════════════════════════════════════════
+        //  SETTINGS & COMPLAINT STATUS
+        // ═════════════════════════════════════════════════════════════════════
 
-        // ── Complaint download handlers ──────────────────────────────────────
-        public async Task<IActionResult> OnGetDownloadComplaintsCsvAsync()
-        {
-            var complaints = await _context.ComplaintLogs.AsNoTracking()
-                .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
-            Logger.Info("OnGetDownloadComplaintsCsv: exporting {0} complaints, admin={1}", complaints.Count, Username);
-            return _reportExportService.ExportComplaintsAsCsv(complaints);
-        }
-
-        public async Task<IActionResult> OnGetDownloadComplaintsXlsxAsync()
-        {
-            var complaints = await _context.ComplaintLogs.AsNoTracking()
-                .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
-            Logger.Info("OnGetDownloadComplaintsXlsx: exporting {0} complaints, admin={1}", complaints.Count, Username);
-            return _reportExportService.ExportComplaintsAsXlsx(complaints);
-        }
-
-        public async Task<IActionResult> OnGetDownloadComplaintsPdfAsync()
-        {
-            var complaints = await _context.ComplaintLogs.AsNoTracking()
-                .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
-            Logger.Info("OnGetDownloadComplaintsPdf: exporting {0} complaints, admin={1}", complaints.Count, Username);
-            return _reportExportService.ExportComplaintsAsPdf(complaints);
-        }
-
-        // ── Settings save handler ─────────────────────────────────────────────
         public async Task<IActionResult> OnPostSaveSettingsAsync([FromBody] SaveSettingsInput input)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+                return UnauthorizedJson();
 
-            Logger.Info("OnPostSaveSettingsAsync: saving settings by admin={0}", Username);
+            Logger.Info("OnPostSaveSettingsAsync by admin={0}", Username);
             try
             {
                 var settingsToSave = new Dictionary<string, string>
                 {
-                    { "complaint_whatsapp_send_to", input.SendTo ?? "Fixed Number" },
-                    { "complaint_whatsapp_number",  input.FixedNumber ?? "" },
-                    { "complaint_message_template", input.MessageTemplate ?? "" },
-                    { "complaint_drive_folder",     input.DriveFolder ?? "" }
+                    ["complaint_whatsapp_send_to"]  = input.SendTo ?? "Fixed Number",
+                    ["complaint_whatsapp_number"]   = input.FixedNumber ?? "",
+                    ["complaint_message_template"]  = input.MessageTemplate ?? "",
+                    ["complaint_drive_folder"]      = input.DriveFolder ?? ""
                 };
 
                 var now = DateTime.UtcNow;
-                foreach (var kv in settingsToSave)
+                foreach (var (key, value) in settingsToSave)
                 {
-                    var existing = await _context.AppConfigs
-                        .FirstOrDefaultAsync(c => c.ConfigKey == kv.Key);
+                    var existing = await _context.AppConfigs.FirstOrDefaultAsync(c => c.ConfigKey == key);
                     if (existing != null)
                     {
-                        existing.ConfigValue = kv.Value;
+                        existing.ConfigValue = value;
                         existing.RowUpdationDateTime = now;
                     }
                     else
                     {
                         _context.AppConfigs.Add(new AppConfig
                         {
-                            ConfigKey = kv.Key,
-                            ConfigValue = kv.Value,
+                            ConfigKey = key,
+                            ConfigValue = value,
                             RowUpdationDateTime = now
                         });
                     }
                 }
 
                 await _context.SaveChangesAsync();
-                Logger.Info("OnPostSaveSettingsAsync: settings saved successfully");
+                Logger.Info("Settings saved successfully");
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
@@ -377,43 +390,59 @@ namespace asset_monitoring.Pages
                 return RedirectToPage("/Index");
 
             _pumpDashboardService.InvalidateCache();
-            Logger.Info("OnGetRefreshData: cache cleared by admin={0}", Username);
+            Logger.Info("Cache cleared by admin={0}", Username);
             return RedirectToPage();
         }
+
+        private static readonly string[] ValidComplaintStatuses = { "RESOLVED", "REJECTED" };
 
         public async Task<IActionResult> OnPostUpdateComplaintStatusAsync([FromBody] UpdateComplaintInput input)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
-                return new JsonResult(new { success = false, message = "Unauthorized" });
+                return UnauthorizedJson();
 
+            if (input == null || input.ComplaintId <= 0)
+                return new JsonResult(new { success = false, message = "Invalid input" });
+
+            var newStatus = input.Status ?? "RESOLVED";
+            if (!ValidComplaintStatuses.Contains(newStatus))
+                return new JsonResult(new { success = false, message = "Invalid status value" });
+
+            Logger.Info("UpdateComplaintStatus: #{0} → {1} by {2}", input.ComplaintId, newStatus, Username);
             try
             {
                 var complaint = await _context.ComplaintLogs.FindAsync(input.ComplaintId);
                 if (complaint == null)
                     return new JsonResult(new { success = false, message = "Complaint not found" });
 
-                complaint.Status = input.Status ?? "RESOLVED";
+                complaint.Status = newStatus;
                 complaint.Remarks = input.Remarks;
                 complaint.RowUpdationDateTime = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
-                Logger.Info("Complaint #{0} updated to {1} by {2}", input.ComplaintId, input.Status, Username);
                 return new JsonResult(new { success = true });
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "OnPostUpdateComplaintStatusAsync failed");
+                Logger.Error(ex, "UpdateComplaintStatus failed for #{0}", input.ComplaintId);
                 return new JsonResult(new { success = false, message = "Failed to update complaint" });
             }
         }
 
         public IActionResult OnPostLogout()
         {
-            Logger.Info("OnPostLogout: admin={0} logged out", Username);
+            Logger.Info("Admin {0} logged out", Username);
             return LogoutAndRedirect();
         }
 
+        // ── Helper: standard 403 response ───────────────────────────────────
+        private static JsonResult UnauthorizedJson()
+            => new(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
     }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  INPUT MODELS
+    // ═════════════════════════════════════════════════════════════════════════
 
     public class UpdateComplaintInput
     {
@@ -440,6 +469,4 @@ namespace asset_monitoring.Pages
         public string Password { get; set; } = "";
         public bool IsActive { get; set; }
     }
-
-
 }
