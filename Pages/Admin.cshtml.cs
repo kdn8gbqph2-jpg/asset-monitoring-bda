@@ -381,6 +381,32 @@ namespace asset_monitoring.Pages
             return RedirectToPage();
         }
 
+        public async Task<IActionResult> OnPostUpdateComplaintStatusAsync([FromBody] UpdateComplaintInput input)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" });
+
+            try
+            {
+                var complaint = await _context.ComplaintLogs.FindAsync(input.ComplaintId);
+                if (complaint == null)
+                    return new JsonResult(new { success = false, message = "Complaint not found" });
+
+                complaint.Status = input.Status ?? "RESOLVED";
+                complaint.Remarks = input.Remarks;
+                complaint.RowUpdationDateTime = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                Logger.Info("Complaint #{0} updated to {1} by {2}", input.ComplaintId, input.Status, Username);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostUpdateComplaintStatusAsync failed");
+                return new JsonResult(new { success = false, message = "Failed to update complaint" });
+            }
+        }
+
         public IActionResult OnPostLogout()
         {
             Logger.Info("OnPostLogout: admin={0} logged out", Username);
@@ -389,6 +415,12 @@ namespace asset_monitoring.Pages
 
     }
 
+    public class UpdateComplaintInput
+    {
+        public int ComplaintId { get; set; }
+        public string? Status { get; set; }
+        public string? Remarks { get; set; }
+    }
 
     public class SaveSettingsInput
     {

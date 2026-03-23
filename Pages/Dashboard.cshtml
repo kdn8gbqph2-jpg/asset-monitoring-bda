@@ -107,7 +107,7 @@
                             <th class="sortable" data-col="5" data-type="str">JE Name <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="6" data-type="str">JE Mobile <span class="sort-icon">⇅</span></th>
                             <th class="col-sticky-right sortable" data-col="7" data-type="str">Status <span class="sort-icon">⇅</span></th>
-                            <th class="text-center">Report</th>
+                            <th class="text-center col-sticky-report">Report</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -140,7 +140,7 @@
                                         <span class="status-dot dot-maint">●</span><span class="badge bg-warning text-dark">MAINTENANCE</span>
                                     }
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center col-sticky-report">
                                     <button class="btn btn-success btn-sm px-2 py-1"
                                             title="Report Issue via WhatsApp"
                                             onclick="openComplaintModal('@p.PumpId', '@(p.VendorName ?? "")', '@(p.Location ?? "")', '@(p.Status ?? "OFF")', '@(p.OperatorName ?? "")', '@(p.OperatorMobile ?? "")', '@(p.JeName ?? "")', '@(p.JeMobile ?? "")')">

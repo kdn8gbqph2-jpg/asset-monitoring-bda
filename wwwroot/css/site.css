@@ -210,25 +210,46 @@ html {
 /* ── Sticky Status column (always visible on the right while scrolling) ──
    Uses an explicit class rather than :last-child so sticky stacking is
    unambiguous regardless of table/overflow-container nesting.           ── */
+/* Report column — rightmost frozen */
+.table-dashboard th.col-sticky-report {
+    position: sticky !important;
+    top: 0 !important;
+    right: 0;
+    z-index: 4;
+    background-color: var(--table-header-bg) !important;
+}
+
+.table-dashboard td.col-sticky-report {
+    position: sticky !important;
+    right: 0;
+    z-index: 2;
+    background-color: #ffffff !important;
+}
+
+.table-dashboard tbody tr:hover td.col-sticky-report {
+    background-color: #f0f6ff !important;
+}
+
+/* Status column — second from right, frozen next to Report */
 .table-dashboard th.col-sticky-right {
     position: sticky !important;
-    top: 0 !important;                                 /* freeze to top too */
-    right: 0;
-    z-index: 4;                                        /* above all other headers */
+    top: 0 !important;
+    right: 65px;                                       /* width of Report column */
+    z-index: 4;
     background-color: var(--table-header-bg) !important;
     box-shadow: -3px 0 6px rgba(0,0,0,0.18);
 }
 
 .table-dashboard td.col-sticky-right {
     position: sticky !important;
-    right: 0;
+    right: 65px;
     z-index: 2;
-    background-color: #ffffff !important;              /* must be opaque */
+    background-color: #ffffff !important;
     box-shadow: -3px 0 6px rgba(0,0,0,0.10);
 }
 
 .table-dashboard tbody tr:hover td.col-sticky-right {
-    background-color: #f0f6ff !important;              /* keep hover tint */
+    background-color: #f0f6ff !important;
 }
 
 /* Sortable column headers */

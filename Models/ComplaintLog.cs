@@ -43,6 +43,9 @@ namespace asset_monitoring.Models
         [MaxLength(20)]
         public string Status { get; set; } = "OPEN"; // OPEN/RESOLVED/REJECTED
 
+        [MaxLength(500)]
+        public string? Remarks { get; set; }
+
         public DateTime RowInsertionDateTime { get; set; }
 
         public DateTime RowUpdationDateTime { get; set; }

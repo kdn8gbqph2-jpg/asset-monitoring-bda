@@ -96,9 +96,9 @@
                 </a>
             </div>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
             <table class="table table-dashboard align-middle">
-                <thead>
+                <thead style="position: sticky; top: 0; z-index: 3;">
                     <tr>
                         <th>#</th>
                         <th>DATE</th>
@@ -111,13 +111,15 @@
                         <th>COMPLAINANT</th>
                         <th>COMP. MOBILE</th>
                         <th>STATUS</th>
+                        <th>REMARKS</th>
+                        <th>ACTIONS</th>
                     </tr>
                 </thead>
                 <tbody>
                 @if (!Model.Complaints.Any())
                 {
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-3">No complaints recorded</td>
+                        <td colspan="13" class="text-center text-muted py-3">No complaints recorded</td>
                     </tr>
                 }
                 else
@@ -179,6 +181,46 @@
                                 else
                                 {
                                     <span class="badge bg-secondary">@c.Status</span>
+                                }
+                            </td>
+                            <td>
+                                @if (c.Status == "OPEN")
+                                {
+                                    <input type="text" class="form-control form-control-sm" id="remarks-@c.ComplaintId"
+                                           placeholder="Add remarks..." style="min-width:150px;" />
+                                }
+                                else
+                                {
+                                    <small class="text-muted">@(c.Remarks ?? "—")</small>
+                                }
+                            </td>
+                            <td class="text-nowrap">
+                                @if (c.Status == "OPEN")
+                                {
+                                    <div class="dropdown">
+                                        <button class="btn btn-primary btn-sm dropdown-toggle" type="button"
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear"></i> Action
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <a class="dropdown-item text-success" href="#"
+                                                   onclick="event.preventDefault(); updateComplaintStatus(@c.ComplaintId, 'RESOLVED')">
+                                                    <i class="bi bi-check-circle me-1"></i> Resolve
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="#"
+                                                   onclick="event.preventDefault(); updateComplaintStatus(@c.ComplaintId, 'REJECTED')">
+                                                    <i class="bi bi-x-circle me-1"></i> Reject
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">—</span>
                                 }
                             </td>
                         </tr>
@@ -399,6 +441,38 @@
         } catch (err) {
             console.error(err);
             alert('Error deleting user');
+        }
+    }
+
+    // ── Complaint actions ─────────────────────────────────────────────────────
+    async function updateComplaintStatus(complaintId, newStatus) {
+        const remarks = document.getElementById('remarks-' + complaintId)?.value?.trim() || '';
+        if (!remarks && newStatus === 'RESOLVED') {
+            alert('Please add remarks before resolving.');
+            document.getElementById('remarks-' + complaintId)?.focus();
+            return;
+        }
+        if (!confirm(`Are you sure you want to ${newStatus === 'RESOLVED' ? 'resolve' : 'reject'} complaint #${complaintId}?`)) return;
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        try {
+            const res = await fetch('?handler=UpdateComplaintStatus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify({ ComplaintId: complaintId, Status: newStatus, Remarks: remarks })
+            });
+            const data = await res.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed: ' + (data.message ?? 'Unknown error'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error updating complaint');
         }
     }
 

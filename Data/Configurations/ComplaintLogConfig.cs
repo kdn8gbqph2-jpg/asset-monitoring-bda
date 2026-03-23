@@ -66,6 +66,10 @@ namespace asset_monitoring.Data.Configurations
             entity.HasIndex(e => e.Status)
                   .HasDatabaseName("idx_complaint_log_status");
 
+            entity.Property(e => e.Remarks)
+                  .HasColumnName("remarks")
+                  .HasMaxLength(500);
+
             entity.Property(e => e.RowInsertionDateTime)
                   .HasColumnName("row_insertion_date_time")
                   .HasDefaultValueSql("CURRENT_TIMESTAMP");
