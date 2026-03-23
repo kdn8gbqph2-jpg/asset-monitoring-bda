@@ -30,6 +30,9 @@ namespace asset_monitoring.Pages
         public List<DashboardPumpDto> Pumps { get; set; } = new();
         public List<BdaPumpLocation> Locations { get; set; } = new();
         public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
+        public List<ComplaintLog> Complaints { get; set; } = new();
+        public int OpenComplaintCount { get; set; }
+        public Dictionary<string, string> AppSettings { get; set; } = new();
         public bool IsAdmin { get; set; }
         public string? LoggedInUserName { get; set; }
 
@@ -66,7 +69,18 @@ namespace asset_monitoring.Pages
                 .AsNoTracking()
                 .ToListAsync();
 
-            Logger.Debug("OnGetAsync: loaded {0} users, {1} pumps for admin", Users.Count, Pumps.Count);
+            // Load complaints (newest first)
+            Complaints = await _context.ComplaintLogs
+                .AsNoTracking()
+                .OrderByDescending(c => c.RowInsertionDateTime)
+                .ToListAsync();
+            OpenComplaintCount = Complaints.Count(c => c.Status == "OPEN");
+
+            // Load app settings
+            var configs = await _context.AppConfigs.AsNoTracking().ToListAsync();
+            AppSettings = configs.ToDictionary(c => c.ConfigKey, c => c.ConfigValue ?? "");
+
+            Logger.Debug("OnGetAsync: loaded {0} users, {1} pumps, {2} complaints for admin", Users.Count, Pumps.Count, Complaints.Count);
             return Page();
         }
 
@@ -283,6 +297,80 @@ namespace asset_monitoring.Pages
             return _reportExportService.ExportPumpsAsPdf(pumps);
         }
 
+        // ── Complaint download handlers ──────────────────────────────────────
+        public async Task<IActionResult> OnGetDownloadComplaintsCsvAsync()
+        {
+            var complaints = await _context.ComplaintLogs.AsNoTracking()
+                .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
+            Logger.Info("OnGetDownloadComplaintsCsv: exporting {0} complaints, admin={1}", complaints.Count, Username);
+            return _reportExportService.ExportComplaintsAsCsv(complaints);
+        }
+
+        public async Task<IActionResult> OnGetDownloadComplaintsXlsxAsync()
+        {
+            var complaints = await _context.ComplaintLogs.AsNoTracking()
+                .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
+            Logger.Info("OnGetDownloadComplaintsXlsx: exporting {0} complaints, admin={1}", complaints.Count, Username);
+            return _reportExportService.ExportComplaintsAsXlsx(complaints);
+        }
+
+        public async Task<IActionResult> OnGetDownloadComplaintsPdfAsync()
+        {
+            var complaints = await _context.ComplaintLogs.AsNoTracking()
+                .OrderByDescending(c => c.RowInsertionDateTime).ToListAsync();
+            Logger.Info("OnGetDownloadComplaintsPdf: exporting {0} complaints, admin={1}", complaints.Count, Username);
+            return _reportExportService.ExportComplaintsAsPdf(complaints);
+        }
+
+        // ── Settings save handler ─────────────────────────────────────────────
+        public async Task<IActionResult> OnPostSaveSettingsAsync([FromBody] SaveSettingsInput input)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
+            Logger.Info("OnPostSaveSettingsAsync: saving settings by admin={0}", Username);
+            try
+            {
+                var settingsToSave = new Dictionary<string, string>
+                {
+                    { "complaint_whatsapp_send_to", input.SendTo ?? "Fixed Number" },
+                    { "complaint_whatsapp_number",  input.FixedNumber ?? "" },
+                    { "complaint_message_template", input.MessageTemplate ?? "" },
+                    { "complaint_drive_folder",     input.DriveFolder ?? "" }
+                };
+
+                var now = DateTime.UtcNow;
+                foreach (var kv in settingsToSave)
+                {
+                    var existing = await _context.AppConfigs
+                        .FirstOrDefaultAsync(c => c.ConfigKey == kv.Key);
+                    if (existing != null)
+                    {
+                        existing.ConfigValue = kv.Value;
+                        existing.RowUpdationDateTime = now;
+                    }
+                    else
+                    {
+                        _context.AppConfigs.Add(new AppConfig
+                        {
+                            ConfigKey = kv.Key,
+                            ConfigValue = kv.Value,
+                            RowUpdationDateTime = now
+                        });
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                Logger.Info("OnPostSaveSettingsAsync: settings saved successfully");
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostSaveSettingsAsync failed");
+                return new JsonResult(new { success = false, message = "Failed to save settings" });
+            }
+        }
+
         public IActionResult OnGetRefreshData()
         {
             if (!IsLoggedIn || UserType != "ADMIN")
@@ -301,6 +389,14 @@ namespace asset_monitoring.Pages
 
     }
 
+
+    public class SaveSettingsInput
+    {
+        public string? SendTo { get; set; }
+        public string? FixedNumber { get; set; }
+        public string? MessageTemplate { get; set; }
+        public string? DriveFolder { get; set; }
+    }
 
     public class EditUserInputModel
     {

@@ -24,6 +24,9 @@ namespace asset_monitoring.Services
         {
             Logger.Info("DailySummaryBackgroundService started");
 
+            // On startup: backfill any incomplete past days (up to 30 days back)
+            await BackfillIncompleteDays(stoppingToken);
+
             // Initial build on startup — today + yesterday
             await SafeBuild(DateTime.UtcNow, stoppingToken);
 
@@ -47,6 +50,37 @@ namespace asset_monitoring.Services
             }
 
             Logger.Info("DailySummaryBackgroundService stopped");
+        }
+
+        /// <summary>
+        /// On startup, find past days where total minutes != 1440 and rebuild them.
+        /// This handles cases where the app was down and summaries are stale/partial.
+        /// </summary>
+        private async Task BackfillIncompleteDays(CancellationToken ct)
+        {
+            try
+            {
+                var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Ist);
+                var today = nowIst.Date;
+
+                // Check last 30 days (excluding today — today is always partial)
+                for (int i = 1; i <= 30; i++)
+                {
+                    if (ct.IsCancellationRequested) return;
+
+                    var date = today.AddDays(-i);
+                    var isIncomplete = await _summaryService.HasIncompleteSummaryAsync(date);
+                    if (isIncomplete)
+                    {
+                        Logger.Info("Backfilling incomplete summary for {0}", date.ToString("yyyy-MM-dd"));
+                        await _summaryService.BuildSummaryForDateAsync(date);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "BackfillIncompleteDays failed");
+            }
         }
 
         private async Task SafeBuild(DateTime nowUtc, CancellationToken ct)

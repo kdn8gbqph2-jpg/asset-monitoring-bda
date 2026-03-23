@@ -267,6 +267,32 @@ namespace asset_monitoring.Services
         }
 
         /// <summary>
+        /// Check if a past date has incomplete summaries (total != 1440 for any pump, or missing pumps).
+        /// </summary>
+        public async Task<bool> HasIncompleteSummaryAsync(DateTime istDate)
+        {
+            var date = istDate.Date;
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var activePumpCount = await db.BdaPumpMasters.CountAsync(p => p.IsActive);
+            var summaries = await db.PumpDailySummaries
+                .Where(s => s.SummaryDate == date)
+                .ToListAsync();
+
+            // Missing entirely or missing some pumps
+            if (summaries.Count < activePumpCount)
+                return true;
+
+            // Check if any summary has total != 1440 (partial day)
+            return summaries.Any(s =>
+            {
+                var total = s.OnMinutes + s.OffMinutes + s.MaintenanceMinutes;
+                return total < 1438; // Allow 2-min rounding tolerance
+            });
+        }
+
+        /// <summary>
         /// Rebuild summaries for a range of dates (backfill).
         /// </summary>
         public async Task BackfillAsync(DateTime istStartDate, DateTime istEndDate)

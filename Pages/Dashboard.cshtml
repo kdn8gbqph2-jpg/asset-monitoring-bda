@@ -106,8 +106,8 @@
                             <th class="sortable" data-col="4" data-type="str">Operator Mobile <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="5" data-type="str">JE Name <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="6" data-type="str">JE Mobile <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="7" data-type="num">Running <span class="sort-icon">⇅</span></th>
-                            <th class="col-sticky-right sortable" data-col="8" data-type="str">Status <span class="sort-icon">⇅</span></th>
+                            <th class="col-sticky-right sortable" data-col="7" data-type="str">Status <span class="sort-icon">⇅</span></th>
+                            <th class="text-center">Report</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -126,25 +126,6 @@
                                 <td>@(p.OperatorMobile ?? "—")</td>
                                 <td>@(p.JeName ?? "—")</td>
                                 <td>@(p.JeMobile ?? "—")</td>
-                                <td>
-                                    @if (p.RunningMinutes > 0)
-                                    {
-                                        var h = p.RunningMinutes / 60;
-                                        var m = p.RunningMinutes % 60;
-                                        if (h > 0)
-                                        {
-                                            <span class="text-success fw-semibold">@h h @m m</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-success fw-semibold">@m m</span>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">—</span>
-                                    }
-                                </td>
                                 <td class="col-sticky-right">
                                     @if (p.Status == "ON")
                                     {
@@ -158,6 +139,13 @@
                                     {
                                         <span class="status-dot dot-maint">●</span><span class="badge bg-warning text-dark">MAINTENANCE</span>
                                     }
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-success btn-sm px-2 py-1"
+                                            title="Report Issue via WhatsApp"
+                                            onclick="openComplaintModal('@p.PumpId', '@(p.VendorName ?? "")', '@(p.Location ?? "")', '@(p.Status ?? "OFF")', '@(p.OperatorName ?? "")', '@(p.OperatorMobile ?? "")', '@(p.JeName ?? "")', '@(p.JeMobile ?? "")')">
+                                        <i class="bi bi-whatsapp"></i>
+                                    </button>
                                 </td>
                             </tr>
                         }
@@ -223,6 +211,85 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= COMPLAINT MODAL ================= -->
+<div class="modal fade" id="complaintModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="complaintForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-header" style="background:#25D366; color:#fff;">
+                    <h5 class="modal-title">
+                        <i class="bi bi-whatsapp me-1"></i> Report Issue
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cmpPumpId" />
+                    <input type="hidden" id="cmpVendor" />
+                    <input type="hidden" id="cmpOperatorName" />
+                    <input type="hidden" id="cmpOperatorMobile" />
+                    <input type="hidden" id="cmpJeName" />
+                    <input type="hidden" id="cmpJeMobile" />
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-semibold text-muted small">Pump ID</label>
+                            <input type="text" class="form-control form-control-sm" id="cmpPumpIdDisplay" readonly />
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label fw-semibold text-muted small">Vendor</label>
+                            <input type="text" class="form-control form-control-sm" id="cmpVendorDisplay" readonly />
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label fw-semibold text-muted small">Location</label>
+                            <input type="text" class="form-control form-control-sm" id="cmpLocationDisplay" readonly />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-muted small">Dashboard Status</label>
+                        <div id="cmpDashStatusBadge"></div>
+                        <input type="hidden" id="cmpDashStatus" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Actual Status on Ground <span class="text-danger">*</span></label>
+                        <select class="form-select" id="cmpActualStatus" required onchange="toggleOtherStatus()">
+                            <option value="">— Select —</option>
+                            <option value="ON">ON</option>
+                            <option value="OFF">OFF</option>
+                            <option value="NOT_WORKING">NOT WORKING</option>
+                            <option value="OTHER">OTHER</option>
+                        </select>
+                        <input type="text" class="form-control mt-2 d-none" id="cmpActualStatusOther"
+                               placeholder="Describe the actual status" maxlength="100" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Complainant Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="cmpName" placeholder="Your name" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Complainant Mobile <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="cmpMobile" placeholder="10-digit mobile" required
+                               pattern="[0-9]{10}" maxlength="10" />
+                    </div>
+
+                    <div id="cmpError" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn text-white" style="background:#25D366;"
+                            onclick="submitComplaint()">
+                        <i class="bi bi-whatsapp me-1"></i> Submit &amp; Send WhatsApp
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -346,8 +413,7 @@
                         const row = document.querySelector(
                             `.table-dashboard tbody tr[data-pump-id="${p.pumpId}"]`);
                         if (row) {
-                            row.cells[7].innerHTML = runningHtml(p.runningMinutes);
-                            row.cells[8].innerHTML = statusHtml(p.status);
+                            row.cells[7].innerHTML = statusHtml(p.status);
                             // Keep openPumpDetail onclick in sync
                             const btn = row.cells[0].querySelector('button');
                             if (btn) {
@@ -629,6 +695,120 @@
                 });
         }
 
+
+        // ── Complaint modal ──────────────────────────────────────────────────
+        function openComplaintModal(pumpId, vendor, location, status, opName, opMobile, jeName, jeMobile) {
+            document.getElementById('cmpPumpId').value          = pumpId;
+            document.getElementById('cmpPumpIdDisplay').value   = pumpId;
+            document.getElementById('cmpVendor').value          = vendor;
+            document.getElementById('cmpVendorDisplay').value   = vendor || '—';
+            document.getElementById('cmpLocationDisplay').value = location || '—';
+            document.getElementById('cmpDashStatus').value      = status;
+            document.getElementById('cmpOperatorName').value    = opName;
+            document.getElementById('cmpOperatorMobile').value  = opMobile;
+            document.getElementById('cmpJeName').value          = jeName;
+            document.getElementById('cmpJeMobile').value        = jeMobile;
+
+            const badgeMap = {
+                'ON':          '<span class="badge-status-on">ON</span>',
+                'OFF':         '<span class="badge-status-off">OFF</span>',
+                'MAINTENANCE': '<span class="badge bg-warning text-dark">MAINTENANCE</span>'
+            };
+            document.getElementById('cmpDashStatusBadge').innerHTML =
+                badgeMap[status] ?? '<span class="badge bg-secondary">UNKNOWN</span>';
+
+            // Reset form fields
+            document.getElementById('cmpActualStatus').value = '';
+            document.getElementById('cmpActualStatusOther').value = '';
+            document.getElementById('cmpActualStatusOther').classList.add('d-none');
+            document.getElementById('cmpName').value         = '';
+            document.getElementById('cmpMobile').value       = '';
+            document.getElementById('cmpError').classList.add('d-none');
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('complaintModal'));
+            modal.show();
+        }
+
+        function toggleOtherStatus() {
+            const sel = document.getElementById('cmpActualStatus');
+            const otherInput = document.getElementById('cmpActualStatusOther');
+            if (sel.value === 'OTHER') {
+                otherInput.classList.remove('d-none');
+                otherInput.focus();
+            } else {
+                otherInput.classList.add('d-none');
+                otherInput.value = '';
+            }
+        }
+
+        async function submitComplaint() {
+            let actualStatus = document.getElementById('cmpActualStatus').value;
+            if (actualStatus === 'OTHER') {
+                actualStatus = document.getElementById('cmpActualStatusOther').value.trim();
+                if (!actualStatus) {
+                    const errEl = document.getElementById('cmpError');
+                    errEl.textContent = 'Please describe the actual status.';
+                    errEl.classList.remove('d-none');
+                    return;
+                }
+            }
+            const mobile       = document.getElementById('cmpMobile').value.trim();
+            const errEl        = document.getElementById('cmpError');
+
+            const name = document.getElementById('cmpName').value.trim();
+            if (!actualStatus || !mobile || !name) {
+                errEl.textContent = 'Complainant Name, Actual Status, and Mobile are required.';
+                errEl.classList.remove('d-none');
+                return;
+            }
+            if (!/^\d{10}$/.test(mobile)) {
+                errEl.textContent = 'Please enter a valid 10-digit mobile number.';
+                errEl.classList.remove('d-none');
+                return;
+            }
+            errEl.classList.add('d-none');
+
+            const token = document.querySelector('#complaintForm input[name="__RequestVerificationToken"]').value;
+            const payload = {
+                PumpId:           document.getElementById('cmpPumpId').value,
+                Location:         document.getElementById('cmpLocationDisplay').value,
+                DashboardStatus:  document.getElementById('cmpDashStatus').value,
+                ActualStatus:     actualStatus,
+                VendorName:       document.getElementById('cmpVendor').value,
+                OperatorName:     document.getElementById('cmpOperatorName').value,
+                OperatorMobile:   document.getElementById('cmpOperatorMobile').value,
+                JeName:           document.getElementById('cmpJeName').value,
+                JeMobile:         document.getElementById('cmpJeMobile').value,
+                ComplainantName:  document.getElementById('cmpName').value.trim(),
+                ComplainantMobile: mobile
+            };
+
+            try {
+                const res  = await fetch('?handler=SubmitComplaint', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
+                    // Open WhatsApp with pre-filled message
+                    if (data.whatsappUrl) {
+                        window.open(data.whatsappUrl, '_blank');
+                    }
+                } else {
+                    errEl.textContent = data.message || 'Failed to submit complaint.';
+                    errEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                console.error('submitComplaint failed', err);
+                errEl.textContent = 'Error submitting complaint. Please try again.';
+                errEl.classList.remove('d-none');
+            }
+        }
 
         // ── Column resize handles ────────────────────────────────────────────
         (function() {

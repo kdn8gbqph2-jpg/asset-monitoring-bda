@@ -4,6 +4,7 @@ using asset_monitoring.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using NLog;
 
 namespace asset_monitoring.Pages
@@ -257,6 +258,107 @@ namespace asset_monitoring.Pages
         {
             var pumps = await _PumpdashboardService.GetPumpsAsync();
             return _reportExportService.ExportPumpsAsPdf(pumps);
+        }
+
+        // ── Complaint submission ──────────────────────────────────────────────
+        public async Task<JsonResult> OnPostSubmitComplaintAsync([FromBody] ComplaintInputModel input)
+        {
+            Logger.Info("OnPostSubmitComplaintAsync: pumpId={0}, mobile={1}", input.PumpId, input.ComplainantMobile);
+            try
+            {
+                if (string.IsNullOrWhiteSpace(input.ComplainantMobile) || string.IsNullOrWhiteSpace(input.ActualStatus))
+                {
+                    return new JsonResult(new { success = false, message = "Actual Status and Mobile are required." });
+                }
+
+                var now = DateTime.UtcNow;
+                var complaint = new ComplaintLog
+                {
+                    PumpId              = int.TryParse(input.PumpId, out var pid) ? pid : 0,
+                    Location            = input.Location,
+                    DashboardStatus     = input.DashboardStatus,
+                    ActualStatus        = input.ActualStatus,
+                    OperatorName        = input.OperatorName,
+                    OperatorMobile      = input.OperatorMobile,
+                    JeName              = input.JeName,
+                    JeMobile            = input.JeMobile,
+                    ComplainantName     = input.ComplainantName,
+                    ComplainantMobile   = input.ComplainantMobile,
+                    Status              = "OPEN",
+                    RowInsertionDateTime = now,
+                    RowUpdationDateTime  = now
+                };
+
+                _db.ComplaintLogs.Add(complaint);
+                await _db.SaveChangesAsync();
+
+                Logger.Info("OnPostSubmitComplaintAsync: complaint #{0} saved for pumpId={1}", complaint.ComplaintId, input.PumpId);
+
+                // Build WhatsApp URL from app config
+                var configs = await _db.AppConfigs.AsNoTracking().ToListAsync();
+                var configDict = configs.ToDictionary(c => c.ConfigKey, c => c.ConfigValue ?? "");
+
+                configDict.TryGetValue("complaint_whatsapp_send_to", out var sendTo);
+                configDict.TryGetValue("complaint_whatsapp_number", out var fixedNumber);
+                configDict.TryGetValue("complaint_message_template", out var template);
+
+                if (string.IsNullOrWhiteSpace(template))
+                {
+                    template = "*PUMP COMPLAINT*\n\nPump ID: {pump_id}\nVendor: {vendor}\nLocation: {location}\nDashboard Status: {status}\nActual Status: {actual_status}\n\nOperator: {operator_name} ({operator_mobile})\nJE: {je_name} ({je_mobile})\n\nComplainant: {complainant_name}\nMobile: {complainant_mobile}";
+                }
+
+                // Replace placeholders
+                var message = template
+                    .Replace("{pump_id}", input.PumpId ?? "")
+                    .Replace("{vendor}", input.VendorName ?? "")
+                    .Replace("{location}", input.Location ?? "")
+                    .Replace("{status}", input.DashboardStatus ?? "")
+                    .Replace("{actual_status}", input.ActualStatus ?? "")
+                    .Replace("{operator_name}", input.OperatorName ?? "")
+                    .Replace("{operator_mobile}", input.OperatorMobile ?? "")
+                    .Replace("{je_name}", input.JeName ?? "")
+                    .Replace("{je_mobile}", input.JeMobile ?? "")
+                    .Replace("{complainant_name}", input.ComplainantName ?? "")
+                    .Replace("{complainant_mobile}", input.ComplainantMobile ?? "");
+
+                // Determine target number(s) — build URL for the first target
+                // sendTo: "JE Mobile" / "Fixed Number" / "Both"
+                string targetNumber = fixedNumber ?? "919680111439";
+                if (sendTo == "JE Mobile" && !string.IsNullOrWhiteSpace(input.JeMobile))
+                {
+                    targetNumber = input.JeMobile.StartsWith("91") ? input.JeMobile : "91" + input.JeMobile;
+                }
+                else if (sendTo == "Both" && !string.IsNullOrWhiteSpace(input.JeMobile))
+                {
+                    // Primary = JE mobile; the user can manually send to fixed number too
+                    targetNumber = input.JeMobile.StartsWith("91") ? input.JeMobile : "91" + input.JeMobile;
+                }
+
+                var encodedMessage = Uri.EscapeDataString(message.Replace("\\n", "\n"));
+                var whatsappUrl = $"https://wa.me/{targetNumber}?text={encodedMessage}";
+
+                return new JsonResult(new { success = true, whatsappUrl });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "OnPostSubmitComplaintAsync failed for pumpId={0}", input.PumpId);
+                return new JsonResult(new { success = false, message = "Failed to submit complaint." });
+            }
+        }
+
+        public class ComplaintInputModel
+        {
+            public string? PumpId { get; set; }
+            public string? VendorName { get; set; }
+            public string? Location { get; set; }
+            public string? DashboardStatus { get; set; }
+            public string? ActualStatus { get; set; }
+            public string? OperatorName { get; set; }
+            public string? OperatorMobile { get; set; }
+            public string? JeName { get; set; }
+            public string? JeMobile { get; set; }
+            public string? ComplainantName { get; set; }
+            public string? ComplainantMobile { get; set; }
         }
 
         // ── Password verification with BCrypt + plain-text migration ──────────

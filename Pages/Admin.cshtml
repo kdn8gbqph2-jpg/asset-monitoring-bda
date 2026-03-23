@@ -72,6 +72,179 @@
 
     <!-- Pump Running Summary -->
     @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
+
+    <!-- Complaint Log Card -->
+    <div class="card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-semibold text-primary m-0">
+                <i class="bi bi-exclamation-triangle-fill icon-title"></i>
+                Complaint Log
+                @if (Model.OpenComplaintCount > 0)
+                {
+                    <span class="badge bg-danger ms-2">@Model.OpenComplaintCount open</span>
+                }
+            </h5>
+            <div class="d-flex gap-1">
+                <a href="?handler=DownloadComplaintsXlsx" class="btn btn-outline-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i>
+                </a>
+                <a href="?handler=DownloadComplaintsPdf" class="btn btn-outline-danger btn-sm" title="Download PDF">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                </a>
+                <a href="?handler=DownloadComplaintsCsv" class="btn btn-outline-secondary btn-sm" title="Download CSV">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                </a>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dashboard align-middle">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>DATE</th>
+                        <th>PUMP ID</th>
+                        <th>LOCATION</th>
+                        <th>DASH. STATUS</th>
+                        <th>ACTUAL STATUS</th>
+                        <th>OPERATOR</th>
+                        <th>JE</th>
+                        <th>COMPLAINANT</th>
+                        <th>COMP. MOBILE</th>
+                        <th>STATUS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (!Model.Complaints.Any())
+                {
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-3">No complaints recorded</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var c in Model.Complaints)
+                    {
+                        <tr>
+                            <td class="text-muted small">@c.ComplaintId</td>
+                            <td class="text-nowrap small">@c.RowInsertionDateTime.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                            <td class="fw-semibold">@c.PumpId</td>
+                            <td>@(c.Location ?? "—")</td>
+                            <td>
+                                @if (c.DashboardStatus == "ON")
+                                {
+                                    <span class="badge-status-on">ON</span>
+                                }
+                                else if (c.DashboardStatus == "MAINTENANCE")
+                                {
+                                    <span class="badge bg-warning text-dark">MAINT</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-status-off">OFF</span>
+                                }
+                            </td>
+                            <td>
+                                @if (c.ActualStatus == "ON")
+                                {
+                                    <span class="badge-status-on">ON</span>
+                                }
+                                else if (c.ActualStatus == "NOT_WORKING")
+                                {
+                                    <span class="badge bg-danger">NOT WORKING</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-status-off">OFF</span>
+                                }
+                            </td>
+                            <td>
+                                <div>@(c.OperatorName ?? "—")</div>
+                                <small class="text-muted">@(c.OperatorMobile ?? "")</small>
+                            </td>
+                            <td>
+                                <div>@(c.JeName ?? "—")</div>
+                                <small class="text-muted">@(c.JeMobile ?? "")</small>
+                            </td>
+                            <td>@(c.ComplainantName ?? "—")</td>
+                            <td>@(c.ComplainantMobile ?? "—")</td>
+                            <td>
+                                @if (c.Status == "OPEN")
+                                {
+                                    <span class="badge bg-danger">OPEN</span>
+                                }
+                                else if (c.Status == "RESOLVED")
+                                {
+                                    <span class="badge bg-success">RESOLVED</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@c.Status</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Settings Card -->
+    <div class="card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-semibold text-primary m-0">
+                <i class="bi bi-gear-fill icon-title"></i>
+                Settings
+            </h5>
+        </div>
+        <form id="settingsForm">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Complaint WhatsApp &mdash; Send To</label>
+                    @{
+                        var sendToVal = Model.AppSettings.GetValueOrDefault("complaint_whatsapp_send_to", "Fixed Number");
+                    }
+                    <select class="form-select" id="settingSendTo">
+                        <option value="JE Mobile" selected="@(sendToVal == "JE Mobile")">JE Mobile</option>
+                        <option value="Fixed Number" selected="@(sendToVal == "Fixed Number")">Fixed Number</option>
+                        <option value="Both" selected="@(sendToVal == "Both")">Both</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Fixed WhatsApp Number</label>
+                    <input type="text" class="form-control" id="settingFixedNumber"
+                           value="@Model.AppSettings.GetValueOrDefault("complaint_whatsapp_number", "")"
+                           placeholder="e.g. 919680111439" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">WhatsApp Message Template</label>
+                    <textarea class="form-control" id="settingTemplate" rows="6"
+                              placeholder="Use placeholders: {pump_id}, {vendor}, {location}, {status}, {actual_status}, {operator_name}, {operator_mobile}, {je_name}, {je_mobile}, {complainant_name}, {complainant_mobile}">@Model.AppSettings.GetValueOrDefault("complaint_message_template", "")</textarea>
+                    <small class="text-muted">
+                        Available tokens: <code>{pump_id}</code> <code>{vendor}</code> <code>{location}</code>
+                        <code>{status}</code> <code>{actual_status}</code> <code>{operator_name}</code>
+                        <code>{operator_mobile}</code> <code>{je_name}</code> <code>{je_mobile}</code>
+                        <code>{complainant_name}</code> <code>{complainant_mobile}</code>
+                    </small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Complaint Drive Folder</label>
+                    <input type="text" class="form-control" id="settingDriveFolder"
+                           value="@Model.AppSettings.GetValueOrDefault("complaint_drive_folder", "")"
+                           placeholder="Google Drive link (optional)" />
+                </div>
+                <div class="col-12">
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                        <i class="bi bi-check-circle me-1"></i> Save Settings
+                    </button>
+                    <span id="settingsSaveMsg" class="ms-2 text-success fw-semibold d-none">
+                        <i class="bi bi-check2"></i> Saved
+                    </span>
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Pump Editor Drawer -->
@@ -226,6 +399,39 @@
         } catch (err) {
             console.error(err);
             alert('Error deleting user');
+        }
+    }
+
+    // ── Settings save ───────────────────────────────────────────────────────
+    async function saveSettings() {
+        const token = document.querySelector('#settingsForm input[name="__RequestVerificationToken"]').value;
+        const payload = {
+            SendTo:          document.getElementById('settingSendTo').value,
+            FixedNumber:     document.getElementById('settingFixedNumber').value.trim(),
+            MessageTemplate: document.getElementById('settingTemplate').value,
+            DriveFolder:     document.getElementById('settingDriveFolder').value.trim()
+        };
+
+        try {
+            const res = await fetch('?handler=SaveSettings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                const msg = document.getElementById('settingsSaveMsg');
+                msg.classList.remove('d-none');
+                setTimeout(() => msg.classList.add('d-none'), 3000);
+            } else {
+                alert('Failed to save settings: ' + (data.message ?? 'Unknown error'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error saving settings');
         }
     }
 
