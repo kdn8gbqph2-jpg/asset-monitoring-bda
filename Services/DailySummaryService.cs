@@ -186,12 +186,7 @@ namespace asset_monitoring.Services
             {
                 statusAtDayStart = lastOngoingLog.NewStatus;
             }
-            else if (currentEntry != null)
-            {
-                // Pump never had a status change — use current status from pump_status_tbl
-                statusAtDayStart = currentEntry.Status;
-            }
-            // else: pump has no status info at all — leave as null
+            // else: resolved below after collecting changesInDay
 
             // ── Step 2: Collect status change events within the day ───────────
             // A "change event" = a log entry whose EndTime falls within [dayStart, dayEnd)
@@ -202,6 +197,18 @@ namespace asset_monitoring.Services
                          && l.EndTime.Value < dayEndUtc)
                 .OrderBy(l => l.EndTime)
                 .ToList();
+
+            // If no pre-day logs found, infer starting status from the first change in the day
+            // (its OldStatus tells us what the pump was in at day start)
+            if (statusAtDayStart == null && changesInDay.Count > 0)
+            {
+                statusAtDayStart = changesInDay[0].OldStatus ?? PumpStatus.Off;
+            }
+            else if (statusAtDayStart == null && currentEntry != null)
+            {
+                // No logs at all — pump never changed status, use current status
+                statusAtDayStart = currentEntry.Status;
+            }
 
             // Also check for sessions that STARTED during the day but have no EndTime
             // (pump turned ON during the day and is still running)

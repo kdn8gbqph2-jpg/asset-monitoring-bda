@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using asset_monitoring.Data;
 using asset_monitoring.Models;
 using Microsoft.Extensions.Caching.Memory;
@@ -57,6 +58,9 @@ namespace asset_monitoring.Services
     public class PumpDashboardService
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        // Per-pump lock to prevent duplicate log entries from concurrent requests
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> PumpLocks = new();
 
         private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById(
             OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
@@ -244,6 +248,10 @@ namespace asset_monitoring.Services
         {
             Logger.Info("UpdatePumpDetailsAsync: pumpId={0}, status={1}, isActive={2}",
                 req.PumpId, req.Status, req.IsActive);
+
+            // Serialize concurrent requests for the same pump to prevent duplicate logs
+            var pumpLock = PumpLocks.GetOrAdd(req.PumpId, _ => new SemaphoreSlim(1, 1));
+            await pumpLock.WaitAsync();
             try
             {
                 var now = DateTime.UtcNow;
@@ -303,7 +311,7 @@ namespace asset_monitoring.Services
                         UpdatedBy            = req.UpdatedBy,
                         OperatorMobile       = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile,
                         JeMobile             = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile,
-                        CurrentStartTime     = newStatus == PumpStatus.On ? now : null,
+                        CurrentStartTime     = now,
                         RowActionCount       = 1,
                         RowInsertionDateTime = now,
                         RowUpdationDateTime  = now
@@ -316,31 +324,52 @@ namespace asset_monitoring.Services
                     // Write audit log whenever the status actually changes
                     if (oldStatus != newStatus)
                     {
-                        _db.PumpStatusLogs.Add(new PumpStatusLog
-                        {
-                            PumpId               = req.PumpId,
-                            OldStatus            = oldStatus,
-                            NewStatus            = newStatus,
-                            StartTime            = entry.CurrentStartTime,
-                            EndTime              = now,
-                            Remarks              = req.Remarks,
-                            UpdatedBy            = req.UpdatedBy,
-                            RowInsertionDateTime = now,
-                            RowUpdationDateTime  = now
-                        });
+                        // Guard against duplicate log entries (e.g. double form submission)
+                        var recentDup = await _db.PumpStatusLogs
+                            .Where(l => l.PumpId == req.PumpId
+                                     && l.OldStatus == oldStatus
+                                     && l.NewStatus == newStatus)
+                            .OrderByDescending(l => l.LogId)
+                            .Select(l => l.EndTime)
+                            .FirstOrDefaultAsync();
 
-                        Logger.Info("UpdatePumpDetailsAsync: pumpId={0} status {1}→{2}",
-                            req.PumpId, oldStatus, newStatus);
+                        var isDuplicate = recentDup.HasValue
+                            && (now - recentDup.Value).TotalHours < 6;
+
+                        if (!isDuplicate)
+                        {
+                            _db.PumpStatusLogs.Add(new PumpStatusLog
+                            {
+                                PumpId               = req.PumpId,
+                                OldStatus            = oldStatus,
+                                NewStatus            = newStatus,
+                                StartTime            = entry.CurrentStartTime,
+                                EndTime              = now,
+                                Remarks              = req.Remarks,
+                                UpdatedBy            = req.UpdatedBy,
+                                RowInsertionDateTime = now,
+                                RowUpdationDateTime  = now
+                            });
+
+                            Logger.Info("UpdatePumpDetailsAsync: pumpId={0} status {1}→{2}",
+                                req.PumpId, oldStatus, newStatus);
+                        }
+                        else
+                        {
+                            Logger.Warn("UpdatePumpDetailsAsync: pumpId={0} skipped duplicate {1}→{2} log (last was {3:s})",
+                                req.PumpId, oldStatus, newStatus, recentDup.Value);
+                        }
                     }
 
-                    // Track running time: set start when turning ON, set end when turning OFF
-                    if (newStatus == PumpStatus.On && oldStatus != PumpStatus.On)
-                        entry.CurrentStartTime = now;
-                    else if (newStatus != PumpStatus.On && oldStatus == PumpStatus.On)
+                    // Track running time: record end when leaving ON status
+                    if (newStatus != PumpStatus.On && oldStatus == PumpStatus.On)
                     {
                         entry.CurrentEndTime = now;
                         entry.LastRunTime    = now;
                     }
+
+                    // Always track when the current status started
+                    entry.CurrentStartTime = now;
 
                     entry.Status              = newStatus;
                     entry.Remarks             = req.Remarks;
@@ -375,6 +404,10 @@ namespace asset_monitoring.Services
             {
                 Logger.Error(ex, "UpdatePumpDetailsAsync failed for pumpId={0}", req.PumpId);
                 throw;
+            }
+            finally
+            {
+                pumpLock.Release();
             }
         }
 
