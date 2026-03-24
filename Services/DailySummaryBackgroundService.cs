@@ -34,7 +34,7 @@ namespace asset_monitoring.Services
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
                     await SafeBuild(DateTime.UtcNow, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
