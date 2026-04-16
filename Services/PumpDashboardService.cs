@@ -36,13 +36,6 @@ namespace asset_monitoring.Services
         public string? UpdatedBy { get; set; }
     }
 
-    public class AssignOperatorRequest
-    {
-        public int PumpId { get; set; }
-        public string OperatorMobile { get; set; } = "";
-        public string? UpdatedBy { get; set; }
-    }
-
     public class PumpLogDto
     {
         public int LogId { get; set; }
@@ -443,35 +436,6 @@ namespace asset_monitoring.Services
             catch (Exception ex)
             {
                 Logger.Error(ex, "GetPumpLogsAsync failed for pumpId={0}", pumpId);
-                throw;
-            }
-        }
-
-        // ── Assign operator to pump ───────────────────────────────────────────
-        public async Task<bool> AssignOperatorAsync(AssignOperatorRequest req)
-        {
-            Logger.Info("AssignOperatorAsync: pumpId={0}, operator={1}", req.PumpId, req.OperatorMobile);
-            try
-            {
-                var entry = await _db.PumpStatusEntries.FindAsync(req.PumpId);
-                if (entry == null)
-                {
-                    Logger.Warn("AssignOperatorAsync: no status entry for pumpId={0}", req.PumpId);
-                    return false;
-                }
-
-                entry.UpdatedBy           = req.UpdatedBy;
-                entry.OperatorMobile      = req.OperatorMobile;
-                entry.RowUpdationDateTime = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
-
-                _cache.Remove(ADMIN_CACHE_KEY);
-                Logger.Info("AssignOperatorAsync: pumpId={0} assigned to {1}", req.PumpId, req.OperatorMobile);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "AssignOperatorAsync failed for pumpId={0}", req.PumpId);
                 throw;
             }
         }

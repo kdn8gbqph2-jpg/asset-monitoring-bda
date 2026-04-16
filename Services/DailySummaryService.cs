@@ -316,16 +316,5 @@ namespace asset_monitoring.Services
             }
         }
 
-        /// <summary>
-        /// Rebuild summaries for a range of dates (backfill).
-        /// </summary>
-        public async Task BackfillAsync(DateTime istStartDate, DateTime istEndDate)
-        {
-            Logger.Info("BackfillAsync: from {0:yyyy-MM-dd} to {1:yyyy-MM-dd}", istStartDate, istEndDate);
-            for (var d = istStartDate.Date; d <= istEndDate.Date; d = d.AddDays(1))
-            {
-                await BuildSummaryForDateAsync(d);
-            }
-        }
     }
 }
