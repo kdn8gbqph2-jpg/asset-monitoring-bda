@@ -1,0 +1,68 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:       # Manual trigger from GitHub UI
+  push:
+    branches: [ main ]    # Auto-deploy on push to main
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish app
+        run: dotnet publish -c Release -o ./publish
+
+      - name: Create deployment archive
+        run: tar -czf deploy.tar.gz -C ./publish .
+
+      - name: Copy archive to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: deploy.tar.gz
+          target: /tmp
+
+      - name: Deploy and restart service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            echo "Stopping service..."
+            sudo systemctl stop asset-monitoring
+
+            echo "Deploying new build..."
+            sudo tar -xzf /tmp/deploy.tar.gz -C /var/www/asset-monitoring
+            sudo chown -R www-data:www-data /var/www/asset-monitoring
+
+            echo "Starting service..."
+            sudo systemctl start asset-monitoring
+
+            echo "Cleaning up..."
+            rm -f /tmp/deploy.tar.gz
+
+            # Wait and verify
+            sleep 3
+            if sudo systemctl is-active --quiet asset-monitoring; then
+              echo "Deployment successful - service is running"
+            else
+              echo "Deployment FAILED - service is not running"
+              sudo journalctl -u asset-monitoring --since "30 seconds ago" --no-pager
+              exit 1
+            fi

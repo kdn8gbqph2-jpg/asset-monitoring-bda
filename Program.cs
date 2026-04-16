@@ -41,10 +41,11 @@ try
         options.Cookie.HttpOnly  = true;
         options.Cookie.IsEssential = true;
         options.Cookie.SameSite    = SameSiteMode.Strict;
-        // Always require Secure cookie in production; allow HTTP in development
-        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-            ? CookieSecurePolicy.SameAsRequest
-            : CookieSecurePolicy.Always;
+        // Use SameAsRequest so cookies work on both HTTP and HTTPS.
+        // When SSL is configured, Nginx sets X-Forwarded-Proto=https,
+        // and ForwardedHeaders middleware makes the request appear as HTTPS,
+        // so cookies will automatically get the Secure flag.
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     });
 
     // Trust the X-Forwarded-* headers sent by Nginx
