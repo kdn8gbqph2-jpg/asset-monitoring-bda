@@ -20,8 +20,6 @@ namespace asset_monitoring.Data
         public DbSet<ComplaintLog> ComplaintLogs { get; set; } = null!;
         public DbSet<AppConfig> AppConfigs { get; set; } = null!;
 
-        public DbSet<ActiveUsers> ActiveUsers => Set<ActiveUsers>();
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfiguration(new BdaPumpMasterConfig());
@@ -32,18 +30,6 @@ namespace asset_monitoring.Data
             modelBuilder.ApplyConfiguration(new PumpDailySummaryConfig());
             modelBuilder.ApplyConfiguration(new ComplaintLogConfig());
             modelBuilder.ApplyConfiguration(new AppConfigConfig());
-
-            modelBuilder.Entity<ActiveUsers>(entity =>
-            {
-                entity.HasNoKey();
-                entity.ToView(null); // IMPORTANT for stored procedure
-                entity.Property(e => e.UserId).HasColumnName("user_id");
-                entity.Property(e => e.Name).HasColumnName("name");
-                entity.Property(e => e.UserName).HasColumnName("userName");
-                entity.Property(e => e.UserType).HasColumnName("user_type");
-                entity.Property(e => e.MobileNumber).HasColumnName("mobile_number");
-                entity.Property(e => e.Password).HasColumnName("password");
-            });
 
             base.OnModelCreating(modelBuilder);
         }

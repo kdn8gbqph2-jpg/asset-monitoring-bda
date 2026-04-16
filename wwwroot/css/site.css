@@ -322,10 +322,6 @@ html {
         border-color: var(--primary-dark);
     }
 
-/* Smooth animation */
-.transition-col {
-    transition: flex 0.35s ease, max-width 0.35s ease, opacity 0.25s ease;
-}
 
 /* =========================================================
    DASHBOARD PANEL HEIGHTS — map and table always match
@@ -453,12 +449,6 @@ html {
     .dashboard-navbar .navbar-brand span { font-size: 0.85rem; }
     .dashboard-navbar { padding-top: 0.4rem; padding-bottom: 0.4rem; }
 }
-
-/* ── Status dots ─────────────────────────────────────────────────────── */
-.status-dot { font-size: 0.6rem; margin-right: 4px; vertical-align: middle; }
-.dot-on   { color: #16A34A; }
-.dot-off  { color: #DC2626; }
-.dot-maint{ color: #F59E0B; }
 
 /* ── Row flash animation (status change) ─────────────────────────────── */
 @keyframes rowFlash {

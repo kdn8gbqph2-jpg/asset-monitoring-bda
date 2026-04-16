@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using NLog;
 using NLog.Web;
 using QuestPDF.Infrastructure;
-using System.IO;
 
 LogManager.Setup().LoadConfigurationFromAppSettings();
 var logger = LogManager.GetCurrentClassLogger();
