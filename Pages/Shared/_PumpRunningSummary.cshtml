@@ -20,42 +20,50 @@
         </span>
     </div>
     <div class="table-responsive">
-        <table class="table table-dashboard align-middle text-center">
+        <table class="table table-dashboard summary-table align-middle text-center">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle text-start">PUMP ID</th>
-                    <th rowspan="2" class="align-middle text-start">VENDOR</th>
-                    <th rowspan="2" class="align-middle text-start">LOCATION</th>
+                    <th rowspan="2" class="align-middle text-start col-hide-mobile">VENDOR</th>
+                    <th rowspan="2" class="align-middle text-start col-hide-mobile">LOCATION</th>
                     <th rowspan="2" class="align-middle">STATUS</th>
-                    <th colspan="3" class="text-center border-bottom-0"
+                    <th colspan="3" class="text-center border-bottom-0 d-none d-sm-table-cell"
                         style="background:#e8f5e9; color:#2e7d32;">
                         <i class="bi bi-sun me-1"></i>TODAY
                     </th>
-                    <th colspan="3" class="text-center border-bottom-0"
+                    <th class="text-center border-bottom-0 d-sm-none"
+                        style="background:#e8f5e9; color:#2e7d32;">
+                        <i class="bi bi-sun me-1"></i>TODAY
+                    </th>
+                    <th colspan="3" class="text-center border-bottom-0 d-none d-sm-table-cell"
                         style="background:#e3f2fd; color:#1565c0;">
                         <i class="bi bi-calendar3 me-1"></i>THIS MONTH
                     </th>
-                    <th rowspan="2" class="align-middle">LAST UPDATED</th>
+                    <th class="text-center border-bottom-0 d-sm-none"
+                        style="background:#e3f2fd; color:#1565c0;">
+                        <i class="bi bi-calendar3 me-1"></i>MONTH
+                    </th>
+                    <th rowspan="2" class="align-middle col-hide-mobile">LAST UPDATED</th>
                 </tr>
                 <tr>
                     @* Today sub-columns *@
                     <th style="background:#e8f5e9; font-size:0.75rem;">
                         <i class="bi bi-play-circle text-success"></i> Running
                     </th>
-                    <th style="background:#e8f5e9; font-size:0.75rem;">
+                    <th class="col-hide-mobile" style="background:#e8f5e9; font-size:0.75rem;">
                         <i class="bi bi-stop-circle text-danger"></i> OFF
                     </th>
-                    <th style="background:#e8f5e9; font-size:0.75rem;">
+                    <th class="col-hide-mobile" style="background:#e8f5e9; font-size:0.75rem;">
                         <i class="bi bi-wrench text-warning"></i> Maint.
                     </th>
                     @* Month sub-columns *@
                     <th style="background:#e3f2fd; font-size:0.75rem;">
                         <i class="bi bi-play-circle text-success"></i> Running
                     </th>
-                    <th style="background:#e3f2fd; font-size:0.75rem;">
+                    <th class="col-hide-mobile" style="background:#e3f2fd; font-size:0.75rem;">
                         <i class="bi bi-stop-circle text-danger"></i> OFF
                     </th>
-                    <th style="background:#e3f2fd; font-size:0.75rem;">
+                    <th class="col-hide-mobile" style="background:#e3f2fd; font-size:0.75rem;">
                         <i class="bi bi-wrench text-warning"></i> Maint.
                     </th>
                 </tr>
@@ -78,8 +86,8 @@
                                 @item.PumpId
                             </a>
                         </td>
-                        <td class="text-start">@item.VendorName</td>
-                        <td class="text-start">@item.Location</td>
+                        <td class="text-start col-hide-mobile">@item.VendorName</td>
+                        <td class="text-start col-hide-mobile">@item.Location</td>
                         <td>
                             @if (item.Status == "ON")
                             {
@@ -100,12 +108,12 @@
                                 @FormatRunTime(item.TodayRunMinutes)
                             </span>
                         </td>
-                        <td>
+                        <td class="col-hide-mobile">
                             <span class="fw-semibold @(item.TodayOffMinutes > 0 ? "text-danger" : "text-muted")">
                                 @FormatRunTime(item.TodayOffMinutes)
                             </span>
                         </td>
-                        <td>
+                        <td class="col-hide-mobile">
                             <span class="fw-semibold @(item.TodayMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
                                 @FormatRunTime(item.TodayMaintenanceMinutes)
                             </span>
@@ -116,17 +124,17 @@
                                 @FormatRunTime(item.MonthRunMinutes)
                             </span>
                         </td>
-                        <td>
+                        <td class="col-hide-mobile">
                             <span class="fw-semibold @(item.MonthOffMinutes > 0 ? "text-danger" : "text-muted")">
                                 @FormatRunTime(item.MonthOffMinutes)
                             </span>
                         </td>
-                        <td>
+                        <td class="col-hide-mobile">
                             <span class="fw-semibold @(item.MonthMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
                                 @FormatRunTime(item.MonthMaintenanceMinutes)
                             </span>
                         </td>
-                        <td class="text-muted small">
+                        <td class="text-muted small col-hide-mobile">
                             @item.LastUpdated.ToLocalTime().ToString("dd MMM, hh:mm tt")
                         </td>
                     </tr>

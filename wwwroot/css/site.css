@@ -297,6 +297,14 @@ html {
     padding: .25em 1.1em;
 }
 
+.badge-status-maint {
+    background: #fef3c7;
+    color: var(--status-maintenance);
+    font-weight: 600;
+    border-radius: 16px;
+    padding: .25em 1.1em;
+}
+
 /* Buttons */
 .btn-primary,
 .btn-outline-primary {
@@ -435,8 +443,15 @@ html {
 
 @media (max-width: 768px) {
     .dashboard-title {
-        font-size: 1.4rem;
+        font-size: 1.15rem;
     }
+}
+
+/* BDA top navbar on mobile */
+@media (max-width: 576px) {
+    .dashboard-navbar .navbar-brand img { height: 28px !important; }
+    .dashboard-navbar .navbar-brand span { font-size: 0.85rem; }
+    .dashboard-navbar { padding-top: 0.4rem; padding-bottom: 0.4rem; }
 }
 
 /* ── Status dots ─────────────────────────────────────────────────────── */
@@ -467,3 +482,172 @@ html {
 }
 
 .col-resizer:hover { background: rgba(255,255,255,0.4); }
+
+/* =========================================================
+   MOBILE OPTIMIZATIONS
+   ========================================================= */
+
+/* ── Small screens (≤ 576px) ──────────────────────────────── */
+@media (max-width: 576px) {
+
+    /* Navbar: stack vertically, reduce padding */
+    .dash-navbar {
+        flex-wrap: wrap;
+        padding: 0.5rem 0.75rem;
+        gap: 0.4rem;
+    }
+    .dash-navbar .nav-title {
+        order: -1;
+        width: 100%;
+        text-align: center;
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+    }
+    .dash-navbar .nav-actions {
+        gap: 0.4rem;
+    }
+    .dash-navbar .btn-nav {
+        padding: 0.25rem 0.55rem;
+        font-size: 0.78rem;
+    }
+    .btn-nav-label { display: none; }   /* icons only on mobile */
+
+    /* KPI cards: tighter on small screens */
+    .kpi-card {
+        padding: 0.6rem 0.75rem;
+    }
+    .kpi-title { font-size: 0.72rem; }
+    .kpi-value { font-size: 1.4rem; }
+
+    /* Dashboard row: auto height on mobile instead of fixed 420px */
+    #dashboardRow {
+        height: auto !important;
+    }
+    #mapCol, #tableCol {
+        height: auto !important;
+    }
+    /* Remove h-100 constraint on cards so they grow with content */
+    #mapCol .card,
+    #tableCol .card {
+        height: auto !important;
+        min-height: auto !important;
+    }
+    /* Let table-responsive grow naturally in the flex card */
+    #tableCol .table-responsive {
+        flex: 0 0 auto;
+        overflow-x: auto;
+    }
+    #map {
+        min-height: 250px !important;
+        height: 250px;
+    }
+
+    /* Expanded modes on mobile */
+    #dashboardRow.expand-map,
+    #dashboardRow.expand-list {
+        height: auto;
+        min-height: auto;
+    }
+    #dashboardRow.expand-map #map {
+        min-height: 350px !important;
+        height: 60vh;
+    }
+
+    /* Table: hide Vendor, Operator, JE columns on mobile (Dashboard only) */
+    #tableCol .table-dashboard th:nth-child(2),
+    #tableCol .table-dashboard td:nth-child(2),
+    #tableCol .table-dashboard th:nth-child(4),
+    #tableCol .table-dashboard td:nth-child(4),
+    #tableCol .table-dashboard th:nth-child(5),
+    #tableCol .table-dashboard td:nth-child(5) {
+        display: none;
+    }
+
+    /* Running Summary: hide Vendor, Location, OFF/Maint sub-columns on mobile */
+    .summary-table th.col-hide-mobile,
+    .summary-table td.col-hide-mobile {
+        display: none;
+    }
+
+    .table-dashboard td,
+    .table-dashboard th {
+        font-size: 0.85rem;
+        padding: 0.35rem 0.5rem;
+    }
+
+    /* Status legend: smaller, wrap */
+    .status-legend {
+        gap: 0.4rem !important;
+        font-size: 0.75rem;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* View toggle buttons */
+    .view-btn, #btnReset {
+        font-size: 0.78rem;
+        padding: 0.2rem 0.5rem;
+    }
+
+    /* Last updated label */
+    #lastUpdatedLabel {
+        font-size: 0.72rem;
+    }
+
+    /* Modals: nearly full-screen */
+    .modal-dialog {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+    .modal-dialog-scrollable .modal-body {
+        max-height: 70vh;
+    }
+
+    /* Pump detail modal: horizontal scroll for log table */
+    #pdLogTableWrap {
+        font-size: 0.8rem;
+    }
+
+    /* Sticky columns: less offset on mobile (narrower report col) */
+    .table-dashboard th.col-sticky-right,
+    .table-dashboard td.col-sticky-right {
+        right: 45px;
+    }
+
+    /* Complaint modal: tighter spacing */
+    .modal-body .row.g-3 { --bs-gutter-y: 0.5rem; }
+
+    /* Container padding */
+    .container-fluid.px-4 {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+}
+
+/* ── Medium screens (≤ 768px) ─────────────────────────────── */
+@media (max-width: 768px) {
+    /* Dashboard row: auto height so map and table stack */
+    #dashboardRow {
+        height: auto;
+    }
+    #mapCol, #tableCol {
+        height: auto;
+    }
+    #map {
+        min-height: 300px;
+    }
+    #mapCol .card, #tableCol .card {
+        height: auto !important;
+        min-height: auto !important;
+    }
+    #tableCol .table-responsive {
+        flex: 0 0 auto;
+    }
+
+    /* Reduce KPI spacing */
+    .kpi-card {
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .kpi-value { font-size: 1.6rem; }
+}

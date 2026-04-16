@@ -25,7 +25,7 @@
             <i class="bi bi-file-earmark-spreadsheet"></i> <span class="btn-nav-label">CSV</span>
         </a>
     </div>
-    <div class="nav-title">Monsoon Pump Dashboard</div>
+    <div class="nav-title dashboard-title">Monsoon Pump Dashboard</div>
     <div class="nav-actions">
         <button class="btn-nav btn-nav-primary"
                 data-bs-toggle="modal"
@@ -68,15 +68,15 @@
 
     <!-- ================= MAP / LIST TOGGLE ================= -->
     <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             <button class="btn btn-outline-secondary btn-sm view-btn" id="btnMap">
-                <i class="bi bi-map"></i> Map View
+                <i class="bi bi-map"></i> <span class="d-none d-sm-inline">Map View</span><span class="d-sm-none">Map</span>
             </button>
             <button class="btn btn-outline-secondary btn-sm view-btn" id="btnList">
-                <i class="bi bi-list-ul"></i> List View
+                <i class="bi bi-list-ul"></i> <span class="d-none d-sm-inline">List View</span><span class="d-sm-none">List</span>
             </button>
             <button class="btn btn-outline-danger btn-sm" id="btnReset" title="Reset view, filters and sort">
-                <i class="bi bi-arrow-counterclockwise"></i> Reset
+                <i class="bi bi-arrow-counterclockwise"></i> <span class="d-none d-sm-inline">Reset</span>
             </button>
         </div>
         <div class="d-flex align-items-center gap-3">
@@ -95,6 +95,12 @@
         </div>
         <div class="col-12 col-md-6" id="tableCol">
             <div class="card h-100 d-flex flex-column">
+                <div class="d-flex align-items-center gap-3 px-3 pt-2 pb-1 small flex-wrap status-legend">
+                    <span class="fw-semibold text-muted">Status:</span>
+                    <span><span class="badge-status-on">ON</span> Running</span>
+                    <span><span class="badge-status-off">OFF</span> Stopped</span>
+                    <span><span class="badge-status-maint">MAINT</span> Maintenance</span>
+                </div>
                 <div class="table-responsive">
                 <table class="table table-dashboard mb-0 align-middle">
                     <thead>
@@ -102,11 +108,9 @@
                             <th class="sortable" data-col="0" data-type="num">Pump ID <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="1" data-type="str">Vendor <span class="sort-icon">⇅</span></th>
                             <th class="sortable" data-col="2" data-type="str">Location <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="3" data-type="str">Operator Name <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="4" data-type="str">Operator Mobile <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="5" data-type="str">JE Name <span class="sort-icon">⇅</span></th>
-                            <th class="sortable" data-col="6" data-type="str">JE Mobile <span class="sort-icon">⇅</span></th>
-                            <th class="col-sticky-right sortable" data-col="7" data-type="str">Status <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="3" data-type="str">Operator <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-col="4" data-type="str">JE <span class="sort-icon">⇅</span></th>
+                            <th class="col-sticky-right sortable" data-col="5" data-type="str">Status <span class="sort-icon">⇅</span></th>
                             <th class="text-center col-sticky-report">Report</th>
                         </tr>
                     </thead>
@@ -122,22 +126,40 @@
                                 </td>
                                 <td>@p.VendorName</td>
                                 <td>@p.Location</td>
-                                <td>@(p.OperatorName ?? "—")</td>
-                                <td>@(p.OperatorMobile ?? "—")</td>
-                                <td>@(p.JeName ?? "—")</td>
-                                <td>@(p.JeMobile ?? "—")</td>
-                                <td class="col-sticky-right">
-                                    @if (p.Status == "ON")
+                                <td class="small">
+                                    @if (p.OperatorName != null)
                                     {
-                                        <span class="status-dot dot-on">●</span><span class="badge-status-on">ON</span>
-                                    }
-                                    else if (p.Status == "OFF")
-                                    {
-                                        <span class="status-dot dot-off">●</span><span class="badge-status-off">OFF</span>
+                                        <span class="fw-semibold">@p.OperatorName</span><br/>
+                                        <span class="text-muted">@(p.OperatorMobile ?? "")</span>
                                     }
                                     else
                                     {
-                                        <span class="status-dot dot-maint">●</span><span class="badge bg-warning text-dark">MAINTENANCE</span>
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td class="small">
+                                    @if (p.JeName != null)
+                                    {
+                                        <span class="fw-semibold">@p.JeName</span><br/>
+                                        <span class="text-muted">@(p.JeMobile ?? "")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td class="col-sticky-right text-center">
+                                    @if (p.Status == "ON")
+                                    {
+                                        <span class="badge-status-on">ON</span>
+                                    }
+                                    else if (p.Status == "OFF")
+                                    {
+                                        <span class="badge-status-off">OFF</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-status-maint">MAINT</span>
                                     }
                                 </td>
                                 <td class="text-center col-sticky-report">
@@ -368,10 +390,10 @@
         // ── Helpers for live DOM patching ───────────────────────────────────
         function statusHtml(status) {
             if (status === 'ON')
-                return '<span class="status-dot dot-on">●</span><span class="badge-status-on">ON</span>';
+                return '<span class="badge-status-on">ON</span>';
             if (status === 'OFF')
-                return '<span class="status-dot dot-off">●</span><span class="badge-status-off">OFF</span>';
-            return '<span class="status-dot dot-maint">●</span><span class="badge bg-warning text-dark">MAINTENANCE</span>';
+                return '<span class="badge-status-off">OFF</span>';
+            return '<span class="badge-status-maint">MAINT</span>';
         }
 
         function runningHtml(minutes) {
@@ -413,7 +435,7 @@
                         const row = document.querySelector(
                             `.table-dashboard tbody tr[data-pump-id="${p.pumpId}"]`);
                         if (row) {
-                            row.cells[7].innerHTML = statusHtml(p.status);
+                            row.cells[5].innerHTML = statusHtml(p.status);
                             // Keep openPumpDetail onclick in sync
                             const btn = row.cells[0].querySelector('button');
                             if (btn) {
