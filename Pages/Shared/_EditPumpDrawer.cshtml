@@ -22,13 +22,29 @@
                 <label class="form-label">Location</label>
                 <input type="text" class="form-control" id="editLocationName">
             </div>
+            <!-- Map-based location picker -->
             <div class="mb-3">
-                <label class="form-label">Latitude</label>
-                <input type="number" step="any" class="form-control" id="editLatitude">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-geo-alt"></i> Pin Location
+                    <span class="text-muted fw-normal small ms-1">(drag pin or type coordinates)</span>
+                </label>
+                <div id="drawerMap" style="height:220px; border-radius:8px; border:1px solid #dee2e6; background:#f0f0f0;">
+                    <div class="d-flex align-items-center justify-content-center h-100 text-muted small">
+                        <i class="bi bi-map me-1"></i> Loading map…
+                    </div>
+                </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Longitude</label>
-                <input type="number" step="any" class="form-control" id="editLongitude">
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">Latitude</label>
+                    <input type="number" step="any" class="form-control form-control-sm" id="editLatitude"
+                           placeholder="27.2046">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">Longitude</label>
+                    <input type="number" step="any" class="form-control form-control-sm" id="editLongitude"
+                           placeholder="77.5051">
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label">Status</label>
