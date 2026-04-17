@@ -2,6 +2,11 @@
 @model asset_monitoring.Pages.AdminModel
 @{
     ViewData["Title"] = "Admin Panel";
+    var ist = TimeZoneInfo.FindSystemTimeZoneById(
+        OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+    string ToIst(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), ist)
+            .ToString("dd MMM, hh:mm tt");
 }
 
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -128,7 +133,7 @@
                     {
                         <tr>
                             <td class="text-muted small">@c.ComplaintId</td>
-                            <td class="text-nowrap small">@c.RowInsertionDateTime.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                            <td class="text-nowrap small">@ToIst(c.RowInsertionDateTime)</td>
                             <td class="fw-semibold">@c.PumpId</td>
                             <td>@(c.Location ?? "—")</td>
                             <td>

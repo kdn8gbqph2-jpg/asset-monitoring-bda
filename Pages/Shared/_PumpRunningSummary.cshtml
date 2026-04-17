@@ -1,5 +1,8 @@
 @model List<asset_monitoring.Services.PumpRunningSummaryDto>
 @{
+    var ist = TimeZoneInfo.FindSystemTimeZoneById(
+        OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+
     string FormatRunTime(int minutes)
     {
         if (minutes <= 0) return "—";
@@ -7,6 +10,10 @@
         var m = minutes % 60;
         return h > 0 ? $"{h}h {m}m" : $"{m}m";
     }
+
+    string ToIst(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), ist)
+            .ToString("dd MMM, hh:mm tt");
 }
 
 <div class="card mb-4">
@@ -135,7 +142,7 @@
                             </span>
                         </td>
                         <td class="text-muted small col-hide-mobile">
-                            @item.LastUpdated.ToLocalTime().ToString("dd MMM, hh:mm tt")
+                            @ToIst(item.LastUpdated)
                         </td>
                     </tr>
                 }

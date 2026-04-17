@@ -47,8 +47,16 @@ jobs:
             echo "Stopping service..."
             sudo systemctl stop asset-monitoring
 
+            echo "Backing up production config..."
+            sudo cp /var/www/asset-monitoring/appsettings.Production.json /tmp/appsettings.Production.json.bak
+
             echo "Deploying new build..."
             sudo tar -xzf /tmp/deploy.tar.gz -C /var/www/asset-monitoring
+
+            echo "Restoring production config..."
+            sudo cp /tmp/appsettings.Production.json.bak /var/www/asset-monitoring/appsettings.Production.json
+            rm -f /tmp/appsettings.Production.json.bak
+
             sudo chown -R www-data:www-data /var/www/asset-monitoring
 
             echo "Starting service..."

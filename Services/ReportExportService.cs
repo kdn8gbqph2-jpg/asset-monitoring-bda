@@ -12,6 +12,10 @@ namespace asset_monitoring.Services
     public class ReportExportService
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById(
+            OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+        private static DateTime ToIst(DateTime utc) =>
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Ist);
 
         // ── CSV ──────────────────────────────────────────────────────────────
         public FileContentResult ExportPumpsAsCsv(List<DashboardPumpDto> pumps)
@@ -240,7 +244,7 @@ namespace asset_monitoring.Services
                 var c = complaints[r];
                 int row = r + 2;
                 ws.Cell(row, 1).Value  = c.ComplaintId;
-                ws.Cell(row, 2).Value  = c.RowInsertionDateTime.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt");
+                ws.Cell(row, 2).Value  = ToIst(c.RowInsertionDateTime).ToString("dd MMM yyyy, hh:mm tt");
                 ws.Cell(row, 3).Value  = c.PumpId;
                 ws.Cell(row, 4).Value  = c.Location       ?? "";
                 ws.Cell(row, 5).Value  = c.DashboardStatus ?? "";
@@ -342,7 +346,7 @@ namespace asset_monitoring.Services
                                 dc.Background(bg).BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(3);
 
                             table.Cell().Element(DataCell).Text(c.ComplaintId.ToString());
-                            table.Cell().Element(DataCell).Text(c.RowInsertionDateTime.ToLocalTime().ToString("dd MMM, HH:mm"));
+                            table.Cell().Element(DataCell).Text(ToIst(c.RowInsertionDateTime).ToString("dd MMM, HH:mm"));
                             table.Cell().Element(DataCell).Text(c.PumpId.ToString());
                             table.Cell().Element(DataCell).Text(c.Location       ?? "");
                             table.Cell().Element(DataCell).Text(c.DashboardStatus ?? "");
