@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   workflow_dispatch:       # Manual trigger from GitHub UI
   push:
-    branches: [ main ]    # Auto-deploy on push to main
+    branches: [ develop ]  # Auto-deploy on push to develop
 
 jobs:
   deploy:
