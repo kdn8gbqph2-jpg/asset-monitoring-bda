@@ -4,8 +4,8 @@ on:
   workflow_dispatch:       # Manual trigger from GitHub UI only
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  build:
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
@@ -22,6 +22,24 @@ jobs:
 
       - name: Create deployment archive
         run: tar -czf deploy.tar.gz -C ./publish .
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: deploy.tar.gz
+          retention-days: 3
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
 
       - name: Copy archive to VPS
         uses: appleboy/scp-action@v0.1.7
