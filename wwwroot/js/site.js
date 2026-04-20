@@ -22,6 +22,52 @@
         document.head.appendChild(js);
     }
 
+    // ── Reverse geocode (Nominatim) ───────────────────────────────────────────
+    let _geocodeTimer = null;          // debounce rapid calls from manual input
+
+    async function reverseGeocode(lat, lng) {
+        const locInput = document.getElementById('editLocationName');
+        if (!locInput) return;
+
+        // Debounce — wait 400ms before firing (handles rapid manual typing)
+        clearTimeout(_geocodeTimer);
+        _geocodeTimer = setTimeout(async () => {
+            const badge = document.getElementById('locationGeoBadge');
+            if (badge) { badge.textContent = 'Fetching…'; badge.classList.remove('d-none'); }
+
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse` +
+                    `?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
+                const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+                if (!res.ok) throw new Error('Network error');
+
+                const data = await res.json();
+                const a = data.address || {};
+
+                // Pick the most specific place name available
+                const name = a.neighbourhood
+                    || a.quarter
+                    || a.suburb
+                    || a.hamlet
+                    || a.village
+                    || a.city_district
+                    || a.county
+                    || '';
+
+                if (name) {
+                    locInput.value = name;
+                    locInput.classList.add('border-success');
+                    setTimeout(() => locInput.classList.remove('border-success'), 1500);
+                    if (badge) badge.textContent = '📍 From map';
+                } else {
+                    if (badge) badge.classList.add('d-none');
+                }
+            } catch (_) {
+                if (badge) badge.classList.add('d-none'); // silent fail
+            }
+        }, 400);
+    }
+
     /** Initialize or reset the drawer map with a draggable marker */
     function initDrawerMap(lat, lng) {
         const hasCoords = lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
@@ -52,18 +98,20 @@
             // Draggable marker
             _drawerMarker = L.marker(center, { draggable: true }).addTo(_drawerMap);
 
-            // Pin drag → update lat/lng fields
+            // Pin drag → update lat/lng fields + reverse geocode
             _drawerMarker.on('dragend', function () {
                 const pos = _drawerMarker.getLatLng();
                 document.getElementById('editLatitude').value  = pos.lat.toFixed(6);
                 document.getElementById('editLongitude').value = pos.lng.toFixed(6);
+                reverseGeocode(pos.lat, pos.lng);
             });
 
-            // Click on map → move pin + update fields
+            // Click on map → move pin + update fields + reverse geocode
             _drawerMap.on('click', function (e) {
                 _drawerMarker.setLatLng(e.latlng);
                 document.getElementById('editLatitude').value  = e.latlng.lat.toFixed(6);
                 document.getElementById('editLongitude').value = e.latlng.lng.toFixed(6);
+                reverseGeocode(e.latlng.lat, e.latlng.lng);
             });
 
             // Manual lat/lng input → move pin
@@ -75,6 +123,7 @@
                 if (!isNaN(la) && !isNaN(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180) {
                     _drawerMarker.setLatLng([la, ln]);
                     _drawerMap.setView([la, ln], _drawerMap.getZoom());
+                    reverseGeocode(la, ln);
                 }
             };
             latInput.addEventListener('change', syncPinFromInputs);
