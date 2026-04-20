@@ -2,10 +2,19 @@
 
 @if (Model.IsLoggedIn)
 {
-    <div class="d-flex justify-content-end align-items-center mb-4" style="gap: 0.75rem;">
+    <div class="d-flex justify-content-end align-items-center mb-4 flex-wrap" style="gap: 0.5rem;">
         <span class="fw-semibold text-secondary">
             <i class="bi bi-person-circle me-1"></i>@Model.Username
         </span>
+
+        <button type="button"
+                class="btn btn-sm btn-outline-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#changePasswordModal"
+                title="Change password">
+            <i class="bi bi-shield-lock me-1"></i>Change Password
+        </button>
+
         <form method="post" asp-page-handler="Logout" class="d-inline m-0">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -13,4 +22,6 @@
             </button>
         </form>
     </div>
+
+    @await Html.PartialAsync("_ChangePasswordModal")
 }
