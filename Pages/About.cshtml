@@ -1,0 +1,199 @@
+@page
+@model asset_monitoring.Pages.AboutModel
+@{
+    ViewData["Title"] = "About";
+}
+
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+
+<style>
+    .about-hero {
+        background: linear-gradient(135deg, #1651b8 0%, #2563EB 100%);
+        color: #fff;
+        padding: 3rem 1rem 2.5rem;
+        border-radius: 0 0 18px 18px;
+    }
+    .about-hero img { height: 72px; width: auto; background: #fff; padding: 6px; border-radius: 10px; }
+    .about-section { padding: 2rem 0; }
+    .about-card {
+        background: #fff;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        padding: 1.5rem;
+        height: 100%;
+        box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .about-card .role-icon {
+        width: 48px; height: 48px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; margin-bottom: .75rem;
+    }
+    .role-admin    { background: #FEE2E2; color: #B91C1C; }
+    .role-je       { background: #DBEAFE; color: #1D4ED8; }
+    .role-operator { background: #DCFCE7; color: #15803D; }
+
+    .feature-list li { padding: .35rem 0; }
+    .feature-list i  { color: var(--primary-color); margin-right: .5rem; }
+    .contact-item    { display: flex; align-items: flex-start; gap: .75rem; padding: .4rem 0; }
+    .contact-item i  { color: var(--primary-color); font-size: 1.2rem; min-width: 1.5rem; }
+    .section-title   { font-weight: 600; color: var(--primary-dark); margin-bottom: 1rem; }
+    .section-title i { color: var(--primary-color); margin-right: .5rem; }
+    .build-badge     { background: #F3F4F6; color: #374151; font-size: .8rem; padding: .3rem .6rem; border-radius: 6px; }
+</style>
+
+<!-- ================= HERO ================= -->
+<section class="about-hero text-center">
+    <div class="container">
+        <img src="~/images/bda-logo.png" alt="BDA logo" class="mb-3" />
+        <h1 class="fw-bold mb-2">About PMS</h1>
+        <p class="lead mb-0">Pump Management System — Bharatpur Development Authority</p>
+    </div>
+</section>
+
+<div class="container about-section">
+
+    <!-- ================= ORGANIZATION ================= -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h4 class="section-title"><i class="bi bi-building"></i>Organization</h4>
+            <div class="about-card">
+                <p class="mb-2">
+                    <strong>Bharatpur Development Authority (BDA)</strong> is the nodal urban development
+                    body responsible for the planned growth, infrastructure, and public services of Bharatpur.
+                </p>
+                <p class="mb-0 text-muted">
+                    The Pump Management System (PMS) is one of several digital initiatives run by BDA to
+                    improve service delivery and transparency across the city's civic infrastructure.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SYSTEM PURPOSE ================= -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h4 class="section-title"><i class="bi bi-gear-wide-connected"></i>About the System</h4>
+            <div class="about-card">
+                <p>
+                    PMS provides a real-time, role-based dashboard for monitoring and managing the city's
+                    monsoon drainage pumps. It enables authorities to track pump status, respond to
+                    complaints, and generate operational reports across all vendor and location sites.
+                </p>
+                <ul class="feature-list mb-0 list-unstyled">
+                    <li><i class="bi bi-check-circle-fill"></i>Live pump status (ON / OFF / Maintenance) with location mapping</li>
+                    <li><i class="bi bi-check-circle-fill"></i>Status history logging and daily run-time summaries</li>
+                    <li><i class="bi bi-check-circle-fill"></i>Citizen complaint capture with automated WhatsApp routing</li>
+                    <li><i class="bi bi-check-circle-fill"></i>Excel / PDF / CSV report exports for any date range</li>
+                    <li><i class="bi bi-check-circle-fill"></i>Role-based access for Admin, Junior Engineer, and Operator</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= USER ROLES ================= -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h4 class="section-title"><i class="bi bi-people-fill"></i>User Roles</h4>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="about-card">
+                <div class="role-icon role-admin"><i class="bi bi-shield-lock-fill"></i></div>
+                <h5 class="fw-bold">Administrator</h5>
+                <p class="text-muted small mb-0">
+                    Manages users, pumps, and locations. Full access to all reports, system configuration,
+                    and historical logs.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="about-card">
+                <div class="role-icon role-je"><i class="bi bi-clipboard-data-fill"></i></div>
+                <h5 class="fw-bold">Junior Engineer (JE)</h5>
+                <p class="text-muted small mb-0">
+                    Oversees pumps assigned to their zone. Assigns operators, reviews running summaries,
+                    and downloads zonal reports.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="about-card">
+                <div class="role-icon role-operator"><i class="bi bi-person-gear"></i></div>
+                <h5 class="fw-bold">Operator</h5>
+                <p class="text-muted small mb-0">
+                    Field user responsible for updating pump status (ON / OFF / Maintenance) and logging
+                    remarks from the site.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= CONTACT ================= -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h4 class="section-title"><i class="bi bi-telephone-fill"></i>Contact</h4>
+            <div class="about-card">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="contact-item">
+                            <i class="bi bi-geo-alt-fill"></i>
+                            <div>
+                                <div class="fw-semibold">Office Address</div>
+                                <div class="text-muted small">
+                                    Bharatpur Development Authority,<br />
+                                    Bharatpur, Rajasthan, India
+                                </div>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <i class="bi bi-envelope-fill"></i>
+                            <div>
+                                <div class="fw-semibold">Support Email</div>
+                                <div class="text-muted small">
+                                    <a href="mailto:bdabharatpur@rajasthan.gov.in" class="text-decoration-none">bdabharatpur@rajasthan.gov.in</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="contact-item">
+                            <i class="bi bi-globe"></i>
+                            <div>
+                                <div class="fw-semibold">Website</div>
+                                <div class="text-muted small">
+                                    <a href="https://bhda.rajasthan.gov.in/home/dptHome" target="_blank" rel="noopener" class="text-decoration-none">bhda.rajasthan.gov.in</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= VERSION / BUILD ================= -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="section-title"><i class="bi bi-info-circle"></i>System Information</h4>
+            <div class="about-card">
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <span class="fw-semibold">Version:</span>
+                        <span class="build-badge ms-2">@asset_monitoring.Pages.AboutModel.AppVersion</span>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <span class="fw-semibold">Build Date:</span>
+                        <span class="build-badge ms-2">@asset_monitoring.Pages.AboutModel.BuildDate</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <a asp-page="/Dashboard" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
