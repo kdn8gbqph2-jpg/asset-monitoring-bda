@@ -1,0 +1,147 @@
+/* ─── BDA Services — shared theme with PMS ─────────────────────────────── */
+:root {
+    --bda-primary:      #2563EB;
+    --bda-primary-dark: #1651b8;
+    --bda-page-bg:      #F8FAFC;
+    --bda-card-bg:      #FFFFFF;
+    --bda-text:         #111827;
+    --bda-muted:        #6B7280;
+    --bda-border:       #E5E7EB;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    background: var(--bda-page-bg);
+    color: var(--bda-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+/* ─── Navbar ─────────────────────────────────────────────────────────── */
+.site-nav {
+    background: var(--bda-primary-dark);
+    color: #fff;
+}
+
+.nav-logo {
+    height: 40px;
+    width: auto;
+    background: #fff;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.nav-title {
+    font-weight: 600;
+    font-size: 1.15rem;
+    letter-spacing: .2px;
+}
+
+/* ─── Hero ───────────────────────────────────────────────────────────── */
+.hero {
+    background: linear-gradient(135deg, #1651b8 0%, #2563EB 100%);
+    color: #fff;
+    padding: 3rem 1rem 3.5rem;
+    border-radius: 0 0 18px 18px;
+    margin-bottom: 2.5rem;
+}
+
+.hero h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.hero p  { opacity: .92; }
+
+/* ─── Services grid ──────────────────────────────────────────────────── */
+.services-wrap { flex: 1; margin-bottom: 3rem; }
+
+.service-card {
+    display: block;
+    background: var(--bda-card-bg);
+    border: 1px solid var(--bda-border);
+    border-radius: 14px;
+    padding: 1.5rem 1.25rem 1.25rem;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.service-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px -10px rgba(37, 99, 235, .25);
+    border-color: var(--bda-primary);
+    color: inherit;
+}
+
+.icon-tile {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+}
+
+.tile-blue   { background: #DBEAFE; color: #1D4ED8; }
+.tile-orange { background: #FFEDD5; color: #C2410C; }
+.tile-green  { background: #DCFCE7; color: #15803D; }
+.tile-purple { background: #EDE9FE; color: #6D28D9; }
+
+.card-title {
+    font-weight: 700;
+    font-size: 1.15rem;
+    margin-bottom: .4rem;
+    color: var(--bda-primary-dark);
+}
+
+.card-desc {
+    color: var(--bda-muted);
+    font-size: .9rem;
+    margin-bottom: 1rem;
+    line-height: 1.45;
+}
+
+.card-host {
+    display: block;
+    font-size: .75rem;
+    color: var(--bda-muted);
+    margin-bottom: .75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.card-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--bda-primary);
+}
+
+.service-card:hover .card-arrow i {
+    transform: translateX(3px);
+    transition: transform .18s ease;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────── */
+.site-footer {
+    background: #fff;
+    border-top: 1px solid var(--bda-border);
+    color: var(--bda-text);
+}
+
+.site-footer a {
+    color: var(--bda-primary);
+    text-decoration: none;
+}
+
+.site-footer a:hover { text-decoration: underline; }
