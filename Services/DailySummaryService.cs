@@ -57,11 +57,18 @@ namespace asset_monitoring.Services
             // Effective end of the day: either midnight or now (whichever is earlier)
             var effectiveDayEndUtc = nowUtc < dayEndUtc ? nowUtc : dayEndUtc;
 
-            // Get all active pumps
-            var pumpIds = await db.BdaPumpMasters
+            // Get all active pumps along with their creation timestamps.
+            // We cap each pump's "day start" at its creation time so a pump added
+            // mid-day isn't credited with time that elapsed before it existed.
+            var pumpInfo = await db.BdaPumpMasters
                 .Where(p => p.IsActive)
-                .Select(p => p.PumpId)
+                .Select(p => new { p.PumpId, p.RowInsertionDateTime })
                 .ToListAsync();
+
+            var pumpIds = pumpInfo.Select(p => p.PumpId).ToList();
+            var pumpCreatedUtc = pumpInfo.ToDictionary(
+                p => p.PumpId,
+                p => DateTime.SpecifyKind(p.RowInsertionDateTime, DateTimeKind.Utc));
 
             // ── Fetch ALL log entries that could affect this day ──────────────
             // We need:
@@ -94,7 +101,8 @@ namespace asset_monitoring.Services
 
                 var summary = ComputeDaySummary(
                     pumpId, date, dayStartUtc, dayEndUtc, effectiveDayEndUtc,
-                    pumpLogs, currentEntries.GetValueOrDefault(pumpId));
+                    pumpLogs, currentEntries.GetValueOrDefault(pumpId),
+                    pumpCreatedUtc[pumpId]);
 
                 summaries.Add(summary);
             }
@@ -137,12 +145,37 @@ namespace asset_monitoring.Services
             DateTime dayEndUtc,
             DateTime effectiveDayEndUtc,
             List<PumpStatusLog> allPumpLogs,
-            PumpStatusEntry? currentEntry)
+            PumpStatusEntry? currentEntry,
+            DateTime pumpCreatedUtc)
         {
             int onMinutes = 0, offMinutes = 0, maintenanceMinutes = 0;
             int statusChangeCount = 0;
             PumpStatus? firstStatus = null;
             PumpStatus? lastStatus  = null;
+
+            // ── Cap the day start at pump creation time ─────────────────────
+            // A pump that was added mid-day should not be credited with any
+            // time before it existed. If the pump was created after the day
+            // even began, there is simply nothing to compute for this date.
+            if (pumpCreatedUtc > dayStartUtc)
+                dayStartUtc = pumpCreatedUtc;
+
+            if (dayStartUtc >= effectiveDayEndUtc)
+            {
+                return new PumpDailySummary
+                {
+                    PumpId               = pumpId,
+                    SummaryDate          = date,
+                    OnMinutes            = 0,
+                    OffMinutes           = 0,
+                    MaintenanceMinutes   = 0,
+                    StatusChangeCount    = 0,
+                    FirstStatus          = null,
+                    LastStatus           = null,
+                    RowInsertionDateTime = DateTime.UtcNow,
+                    RowUpdationDateTime  = DateTime.UtcNow
+                };
+            }
 
             // ── Step 1: Determine starting status at dayStart ────────────────
             // We check BOTH completed logs and ongoing sessions, then pick whichever

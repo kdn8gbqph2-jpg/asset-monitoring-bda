@@ -623,7 +623,10 @@ namespace asset_monitoring.Services
                 RowUpdationDateTime  = now
             });
 
-            // Seed an initial OFF status entry so the pump appears on the dashboard
+            // Seed an initial OFF status entry so the pump appears on the dashboard.
+            // CurrentStartTime = now ensures the first status-change log has a valid
+            // StartTime (NULL here would be dropped by DailySummaryService's StartTime
+            // filter, causing the summary to fall back to "entire day in current status").
             _db.PumpStatusEntries.Add(new PumpStatusEntry
             {
                 PumpId               = pump.PumpId,
@@ -631,6 +634,7 @@ namespace asset_monitoring.Services
                 UpdatedBy            = req.UpdatedBy,
                 OperatorMobile       = string.IsNullOrEmpty(req.OperatorMobile) ? null : req.OperatorMobile,
                 JeMobile             = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile,
+                CurrentStartTime     = now,
                 RowActionCount       = 1,
                 RowInsertionDateTime = now,
                 RowUpdationDateTime  = now
