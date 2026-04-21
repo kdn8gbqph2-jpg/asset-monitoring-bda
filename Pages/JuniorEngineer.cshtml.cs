@@ -1,6 +1,8 @@
+using asset_monitoring.Data;
 using asset_monitoring.Models;
 using asset_monitoring.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NLog;
 
 namespace asset_monitoring.Pages
@@ -11,17 +13,22 @@ namespace asset_monitoring.Pages
 
         private readonly PumpDashboardService _pumpService;
         private readonly ReportExportService  _reportExportService;
+        private readonly ApplicationDbContext _context;
 
         public List<DashboardPumpDto> Pumps { get; private set; } = new();
         public List<PumpRunningSummaryDto> RunningSummary { get; private set; } = new();
+        public List<ComplaintLog> Complaints { get; private set; } = new();
+        public int OpenComplaintCount { get; private set; }
         public string? LoggedInUserName { get; private set; }
 
         public JuniorEngineerModel(
             PumpDashboardService pumpService,
-            ReportExportService  reportExportService)
+            ReportExportService  reportExportService,
+            ApplicationDbContext context)
         {
             _pumpService         = pumpService;
             _reportExportService = reportExportService;
+            _context             = context;
         }
 
         public async Task<IActionResult> OnGetAsync()
@@ -45,7 +52,62 @@ namespace asset_monitoring.Pages
             Pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
             RunningSummary = await _pumpService.GetPumpRunningSummaryAsync(UserId, UserType);
 
+            // Complaints: JE sees only those assigned to them (by je_mobile); ADMIN sees all
+            var complaintQuery = _context.ComplaintLogs.AsNoTracking();
+            if (UserType == "JE" && !string.IsNullOrWhiteSpace(Mobile))
+            {
+                complaintQuery = complaintQuery.Where(c => c.JeMobile == Mobile);
+            }
+            Complaints = await complaintQuery
+                .OrderByDescending(c => c.RowInsertionDateTime)
+                .ToListAsync();
+            OpenComplaintCount = Complaints.Count(c => c.Status == "OPEN");
+
             return Page();
+        }
+
+        // ── Complaint actions ─────────────────────────────────────────────
+        // Admin can update any; JE can only update complaints assigned to them.
+        public async Task<IActionResult> OnPostUpdateComplaintStatusAsync([FromBody] UpdateComplaintInput input)
+        {
+            if (!IsLoggedIn || (UserType != "JE" && UserType != "ADMIN"))
+                return new JsonResult(new { success = false, message = "Unauthorized" }) { StatusCode = 403 };
+
+            if (input == null || input.ComplaintId <= 0)
+                return new JsonResult(new { success = false, message = "Invalid input" });
+
+            var newStatus = input.Status ?? "RESOLVED";
+            if (newStatus != "RESOLVED" && newStatus != "REJECTED")
+                return new JsonResult(new { success = false, message = "Invalid status value" });
+
+            try
+            {
+                var complaint = await _context.ComplaintLogs.FindAsync(input.ComplaintId);
+                if (complaint == null)
+                    return new JsonResult(new { success = false, message = "Complaint not found" });
+
+                // JE can only update complaints assigned to them
+                if (UserType == "JE" && complaint.JeMobile != Mobile)
+                {
+                    Logger.Warn("JE UpdateComplaintStatus: user={0} tried to modify complaint #{1} assigned to {2}",
+                        Username, complaint.ComplaintId, complaint.JeMobile);
+                    return new JsonResult(new { success = false, message = "This complaint is not assigned to you" })
+                        { StatusCode = 403 };
+                }
+
+                complaint.Status = newStatus;
+                complaint.Remarks = input.Remarks;
+                complaint.RowUpdationDateTime = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                Logger.Info("JE UpdateComplaintStatus: #{0} → {1} by {2}", input.ComplaintId, newStatus, Username);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JE UpdateComplaintStatus failed for #{0}", input.ComplaintId);
+                return new JsonResult(new { success = false, message = "Failed to update complaint" });
+            }
         }
 
         // ── Update pump details ────────────────────────────────────────────

@@ -2,11 +2,6 @@
 @model asset_monitoring.Pages.AdminModel
 @{
     ViewData["Title"] = "Admin Panel";
-    var ist = TimeZoneInfo.FindSystemTimeZoneById(
-        OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
-    string ToIst(DateTime utc) =>
-        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), ist)
-            .ToString("dd MMM, hh:mm tt");
 }
 
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -79,162 +74,13 @@
     @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
 
     <!-- Complaint Log Card -->
-    <div class="card mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="fw-semibold text-primary m-0">
-                <i class="bi bi-exclamation-triangle-fill icon-title"></i>
-                Complaint Log
-                @if (Model.OpenComplaintCount > 0)
-                {
-                    <span class="badge bg-danger ms-2">@Model.OpenComplaintCount open</span>
-                }
-            </h5>
-            <div class="d-flex gap-1">
-                <a href="?handler=DownloadComplaintsXlsx" class="btn btn-outline-success btn-sm" title="Download Excel">
-                    <i class="bi bi-file-earmark-excel"></i>
-                </a>
-                <a href="?handler=DownloadComplaintsPdf" class="btn btn-outline-danger btn-sm" title="Download PDF">
-                    <i class="bi bi-file-earmark-pdf"></i>
-                </a>
-                <a href="?handler=DownloadComplaintsCsv" class="btn btn-outline-secondary btn-sm" title="Download CSV">
-                    <i class="bi bi-file-earmark-spreadsheet"></i>
-                </a>
-            </div>
-        </div>
-        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-            <table class="table table-dashboard align-middle">
-                <thead style="position: sticky; top: 0; z-index: 3;">
-                    <tr>
-                        <th>#</th>
-                        <th>DATE</th>
-                        <th>PUMP ID</th>
-                        <th>LOCATION</th>
-                        <th>DASH. STATUS</th>
-                        <th>ACTUAL STATUS</th>
-                        <th>OPERATOR</th>
-                        <th>JE</th>
-                        <th>COMPLAINANT</th>
-                        <th>COMP. MOBILE</th>
-                        <th>STATUS</th>
-                        <th>REMARKS</th>
-                        <th>ACTIONS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @if (!Model.Complaints.Any())
-                {
-                    <tr>
-                        <td colspan="13" class="text-center text-muted py-3">No complaints recorded</td>
-                    </tr>
-                }
-                else
-                {
-                    foreach (var c in Model.Complaints)
-                    {
-                        <tr>
-                            <td class="text-muted small">@c.ComplaintId</td>
-                            <td class="text-nowrap small">@ToIst(c.RowInsertionDateTime)</td>
-                            <td class="fw-semibold">@c.PumpId</td>
-                            <td>@(c.Location ?? "—")</td>
-                            <td>
-                                @if (c.DashboardStatus == "ON")
-                                {
-                                    <span class="badge-status-on">ON</span>
-                                }
-                                else if (c.DashboardStatus == "MAINTENANCE")
-                                {
-                                    <span class="badge bg-warning text-dark">MAINT</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-status-off">OFF</span>
-                                }
-                            </td>
-                            <td>
-                                @if (c.ActualStatus == "ON")
-                                {
-                                    <span class="badge-status-on">ON</span>
-                                }
-                                else if (c.ActualStatus == "NOT_WORKING")
-                                {
-                                    <span class="badge bg-danger">NOT WORKING</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-status-off">OFF</span>
-                                }
-                            </td>
-                            <td>
-                                <div>@(c.OperatorName ?? "—")</div>
-                                <small class="text-muted">@(c.OperatorMobile ?? "")</small>
-                            </td>
-                            <td>
-                                <div>@(c.JeName ?? "—")</div>
-                                <small class="text-muted">@(c.JeMobile ?? "")</small>
-                            </td>
-                            <td>@(c.ComplainantName ?? "—")</td>
-                            <td>@(c.ComplainantMobile ?? "—")</td>
-                            <td>
-                                @if (c.Status == "OPEN")
-                                {
-                                    <span class="badge bg-danger">OPEN</span>
-                                }
-                                else if (c.Status == "RESOLVED")
-                                {
-                                    <span class="badge bg-success">RESOLVED</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-secondary">@c.Status</span>
-                                }
-                            </td>
-                            <td>
-                                @if (c.Status == "OPEN")
-                                {
-                                    <input type="text" class="form-control form-control-sm" id="remarks-@c.ComplaintId"
-                                           placeholder="Add remarks..." style="min-width:150px;" />
-                                }
-                                else
-                                {
-                                    <small class="text-muted">@(c.Remarks ?? "—")</small>
-                                }
-                            </td>
-                            <td class="text-nowrap">
-                                @if (c.Status == "OPEN")
-                                {
-                                    <div class="dropdown">
-                                        <button class="btn btn-primary btn-sm dropdown-toggle" type="button"
-                                                data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-gear"></i> Action
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li>
-                                                <a class="dropdown-item text-success" href="#"
-                                                   onclick="event.preventDefault(); updateComplaintStatus(@c.ComplaintId, 'RESOLVED')">
-                                                    <i class="bi bi-check-circle me-1"></i> Resolve
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item text-danger" href="#"
-                                                   onclick="event.preventDefault(); updateComplaintStatus(@c.ComplaintId, 'REJECTED')">
-                                                    <i class="bi bi-x-circle me-1"></i> Reject
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <span class="text-muted small">—</span>
-                                }
-                            </td>
-                        </tr>
-                    }
-                }
-                </tbody>
-            </table>
-        </div>
-    </div>
+    @await Html.PartialAsync("Shared/_ComplaintLog", new asset_monitoring.Models.ComplaintLogViewModel
+    {
+        Complaints = Model.Complaints,
+        OpenComplaintCount = Model.OpenComplaintCount,
+        ShowExports = true,
+        ShowActions = true
+    })
 
     <!-- Settings Card -->
     <div class="card mb-4">
@@ -449,37 +295,7 @@
         }
     }
 
-    // ── Complaint actions ─────────────────────────────────────────────────────
-    async function updateComplaintStatus(complaintId, newStatus) {
-        const remarks = document.getElementById('remarks-' + complaintId)?.value?.trim() || '';
-        if (!remarks && newStatus === 'RESOLVED') {
-            alert('Please add remarks before resolving.');
-            document.getElementById('remarks-' + complaintId)?.focus();
-            return;
-        }
-        if (!confirm(`Are you sure you want to ${newStatus === 'RESOLVED' ? 'resolve' : 'reject'} complaint #${complaintId}?`)) return;
-
-        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-        try {
-            const res = await fetch('?handler=UpdateComplaintStatus', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': token
-                },
-                body: JSON.stringify({ ComplaintId: complaintId, Status: newStatus, Remarks: remarks })
-            });
-            const data = await res.json();
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Failed: ' + (data.message ?? 'Unknown error'));
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error updating complaint');
-        }
-    }
+    // Complaint actions live in the shared _ComplaintLog partial's script block.
 
     // ── Settings save ───────────────────────────────────────────────────────
     async function saveSettings() {

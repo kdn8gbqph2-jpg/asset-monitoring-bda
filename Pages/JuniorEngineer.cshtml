@@ -45,6 +45,15 @@
 
     <!-- Pump Running Summary -->
     @await Html.PartialAsync("Shared/_PumpRunningSummary", Model.RunningSummary)
+
+    <!-- Complaint Log (filtered to this JE's assigned complaints) -->
+    @await Html.PartialAsync("Shared/_ComplaintLog", new asset_monitoring.Models.ComplaintLogViewModel
+    {
+        Complaints = Model.Complaints,
+        OpenComplaintCount = Model.OpenComplaintCount,
+        ShowExports = false,
+        ShowActions = true
+    })
 </div>
 
 <!-- Pump Editor Drawer (reuse shared partial) -->
