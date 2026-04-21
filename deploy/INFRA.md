@@ -11,8 +11,10 @@ Handoff reference for future Claude sessions. Keep this file updated whenever th
 | **App** | ASP.NET Core 8 Razor Pages (`asset-monitoring.csproj`, target `net8.0`) |
 | **Repo** | https://github.com/… (branch `develop` is the deploy source) |
 | **Production URL** | https://pms.bdabharatpur.org |
+| **Services hub** | https://services.bdabharatpur.org (static HTML landing page, listing PMS / DMS / E-Works / E-Accounts) |
 | **VPS IP** | `69.62.80.7` (direct `http://69.62.80.7` is blocked — returns `444`) |
 | **Parent domain** | `bdabharatpur.org` (other subdomains planned, e.g. `dms.bdabharatpur.org`) |
+| **VPS SSH user** | `itadmin` (passwordless sudo). Root login disabled. |
 | **SSL** | Let's Encrypt via `certbot --nginx` (auto-renew enabled) |
 | **Hosting firewall** | Only ports **80 / 443 / 2222** allowed inbound (provider-level, can't add more) |
 
@@ -38,8 +40,9 @@ Handoff reference for future Claude sessions. Keep this file updated whenever th
 ### Nginx (`/etc/nginx/sites-available/`)
 - `default` — catch-all, returns `444` to block direct-IP access
 - `pms-bdabharatpur` — subdomain config, certbot-managed, proxies `/` → `http://localhost:5010`
+- `services-bdabharatpur` — static site for `services.bdabharatpur.org`, certbot-managed, root `/var/www/services-bdabharatpur`
+- `archives-bda` — DMS, proxies to `localhost:5000` (site) + `localhost:5001` (API)
 - `nginx.conf` has `server_tokens off`
-- Duplicate `dcsdms` config still present (conflicts with `archives-bda`) — cleanup pending
 
 ### SSH
 - Port `2222` (standard `22` blocked at provider firewall)
@@ -52,8 +55,9 @@ Handoff reference for future Claude sessions. Keep this file updated whenever th
 
 ### Fail2ban (`/etc/fail2ban/jail.local`)
 - `sshd` jail
-- 3 nginx jails (`nginx-http-auth`, `nginx-botsearch`, `nginx-bad-request`)
+- 3 nginx jails (`nginx-http-auth`, `nginx-botsearch`, `nginx-limit-req`)
 - `banaction = ufw` — integrates bans with UFW
+- Unban an IP: `sudo fail2ban-client set sshd unbanip <IP>` (substitute jail name as needed)
 
 ---
 
@@ -137,7 +141,7 @@ Carry-overs that haven't been completed yet:
 - [ ] SSH: set `PasswordAuthentication no`
 - [ ] Lock unused `ubuntu` user (has NOPASSWD sudo)
 - [ ] `chmod 640` on `appsettings.Production.json`
-- [ ] Remove duplicate `dcsdms` Nginx config
+- [x] Remove duplicate `dcsdms` Nginx config (done 2026-04-21 — also cleaned up orphan `archives-bday` and `asset-monitoring` files in `sites-available`)
 
 ### Operational
 - [ ] MySQL daily backups (cron + `mysqldump` + rotation)
