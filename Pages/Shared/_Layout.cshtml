@@ -31,13 +31,20 @@
     </div>
 
     <footer class="footer text-center py-3 bg-light">
+        <p class="mb-1 text-muted" style="max-width: 760px; margin-left:auto; margin-right:auto;">
+            <strong>Pump Management System (PMS)</strong> &mdash;
+            real-time monitoring of BDA monsoon drainage pumps, with
+            on-ground status logged by operators and oversight by junior engineers.
+        </p>
         <p class="mb-1">
             &copy; @DateTime.Now.Year Bharatpur Development Authority. All rights reserved.
         </p>
-        <p class="mb-0 small text-muted">
-            <a asp-page="/About" class="text-decoration-none">About</a>
+        <p class="mb-0 text-muted">
+            <a asp-page="/About" class="text-decoration-none fw-semibold" style="font-size: 1rem;">
+                <i class="bi bi-info-circle"></i> About
+            </a>
             <span class="mx-2">·</span>
-            <span>v@(asset_monitoring.Pages.AboutModel.AppVersion)</span>
+            <span class="small">v@(asset_monitoring.Pages.AboutModel.AppVersion)</span>
         </p>
     </footer>
 
