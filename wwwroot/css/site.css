@@ -43,6 +43,25 @@ body {
             color: #E0E7FF !important;
         }
 
+/* Return-to-homepage ghost button on the dashboard navbar */
+.dashboard-navbar .nav-home {
+    color: #fff;
+    text-decoration: none;
+    font-size: .9rem;
+    font-weight: 500;
+    padding: .4rem .85rem;
+    border: 1px solid rgba(255,255,255,.4);
+    border-radius: 6px;
+    transition: background .18s ease, border-color .18s ease;
+    white-space: nowrap;
+}
+
+    .dashboard-navbar .nav-home:hover {
+        background: rgba(255,255,255,.12);
+        border-color: #fff;
+        color: #fff;
+    }
+
 /* Remove any gap between header and body */
 header { margin-bottom: 0 !important; }
 
