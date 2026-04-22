@@ -163,7 +163,8 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">Username <span class="text-danger">*</span> <small class="text-muted">(used to login)</small></label>
-                <input type="text" class="form-control" id="editUserUsername" placeholder="e.g. admin_1, je_user" required />
+                <input type="text" class="form-control" id="editUserUsername" placeholder="e.g. admin_1, je_user" autocomplete="off" required />
+                <div id="usernameFeedback" class="form-text mt-1" aria-live="polite"></div>
             </div>
             <div class="mb-3">
                 <label class="form-label">Role</label>
@@ -217,6 +218,7 @@
             '<i class="bi bi-pencil-square"></i> Edit User';
         document.getElementById('userDrawerSaveBtn').textContent = 'Save Changes';
 
+        resetUsernameFeedback();
         userDrawer = getUserDrawer();
         userDrawer.show();
     }
@@ -234,9 +236,78 @@
             '<i class="bi bi-person-plus"></i> Add User';
         document.getElementById('userDrawerSaveBtn').textContent = 'Add User';
 
+        resetUsernameFeedback();
         userDrawer = getUserDrawer();
         userDrawer.show();
     }
+
+    // ── Username availability ────────────────────────────────────────────────
+    const usernameInput = document.getElementById('editUserUsername');
+    const usernameFeedback = document.getElementById('usernameFeedback');
+    let usernameCheckTimer = null;
+    let usernameCheckSeq = 0;
+
+    function resetUsernameFeedback() {
+        usernameInput.classList.remove('is-valid', 'is-invalid');
+        usernameFeedback.className = 'form-text mt-1';
+        usernameFeedback.textContent = '';
+    }
+
+    function renderSuggestions(list) {
+        if (!list || !list.length) return '';
+        const chips = list.map(s =>
+            `<button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1"
+                     onclick="applyUsernameSuggestion('${s.replace(/'/g, "\\'")}')">${s}</button>`
+        ).join('');
+        return `<div class="mt-1">Try: ${chips}</div>`;
+    }
+
+    function applyUsernameSuggestion(name) {
+        usernameInput.value = name;
+        checkUsernameAvailability();
+        usernameInput.focus();
+    }
+
+    async function checkUsernameAvailability() {
+        const name = usernameInput.value.trim();
+        if (!name) { resetUsernameFeedback(); return; }
+
+        const seq = ++usernameCheckSeq;
+        usernameFeedback.className = 'form-text mt-1 text-muted';
+        usernameFeedback.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking…';
+        usernameInput.classList.remove('is-valid', 'is-invalid');
+
+        const excludeId = parseInt(document.getElementById('editUserId').value) || 0;
+        try {
+            const url  = `?handler=CheckUsername&username=${encodeURIComponent(name)}`
+                       + (excludeId > 0 ? `&excludeUserId=${excludeId}` : '');
+            const res  = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (seq !== usernameCheckSeq) return; // stale response
+
+            if (data.available) {
+                usernameInput.classList.add('is-valid');
+                usernameInput.classList.remove('is-invalid');
+                usernameFeedback.className = 'form-text mt-1 text-success';
+                usernameFeedback.innerHTML = '<i class="bi bi-check-circle-fill"></i> Username is available';
+            } else {
+                usernameInput.classList.add('is-invalid');
+                usernameInput.classList.remove('is-valid');
+                usernameFeedback.className = 'form-text mt-1 text-danger';
+                usernameFeedback.innerHTML =
+                    '<i class="bi bi-x-circle-fill"></i> Username is already taken'
+                    + renderSuggestions(data.suggestions);
+            }
+        } catch (err) {
+            console.error('Username check failed', err);
+            if (seq === usernameCheckSeq) resetUsernameFeedback();
+        }
+    }
+
+    usernameInput.addEventListener('input', () => {
+        clearTimeout(usernameCheckTimer);
+        usernameCheckTimer = setTimeout(checkUsernameAvailability, 350);
+    });
 
     async function saveUser() {
         const userId  = parseInt(document.getElementById('editUserId').value);
@@ -269,8 +340,21 @@
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
-            if (data.success) { userDrawer.hide(); location.reload(); }
-            else alert('Failed: ' + (data.message ?? 'Unknown error'));
+            if (data.success) { userDrawer.hide(); location.reload(); return; }
+
+            // Duplicate username — show inline chips instead of a plain alert
+            if (Array.isArray(data.suggestions) && data.suggestions.length) {
+                usernameInput.classList.add('is-invalid');
+                usernameInput.classList.remove('is-valid');
+                usernameFeedback.className = 'form-text mt-1 text-danger';
+                usernameFeedback.innerHTML =
+                    '<i class="bi bi-x-circle-fill"></i> ' + (data.message ?? 'Username is already taken')
+                    + renderSuggestions(data.suggestions);
+                usernameInput.focus();
+                return;
+            }
+
+            alert('Failed: ' + (data.message ?? 'Unknown error'));
         } catch (err) {
             console.error(err);
             alert('Error saving user');

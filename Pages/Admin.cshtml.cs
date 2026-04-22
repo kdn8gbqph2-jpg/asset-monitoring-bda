@@ -163,6 +163,22 @@ namespace asset_monitoring.Pages
                     return new JsonResult(new { success = false, message = "User not found" });
                 }
 
+                // Username uniqueness — only check when it's actually changing
+                if (!string.IsNullOrWhiteSpace(req.Username) &&
+                    !string.Equals(req.Username, user.Username, StringComparison.OrdinalIgnoreCase))
+                {
+                    var (takenU, suggestionsU) = await CheckUsernameAsync(req.Username.Trim(), user.UserId);
+                    if (takenU)
+                    {
+                        return new JsonResult(new
+                        {
+                            success     = false,
+                            message     = $"Username '{req.Username}' is already taken",
+                            suggestions = suggestionsU
+                        });
+                    }
+                }
+
                 user.Name = req.Name;
                 if (!string.IsNullOrWhiteSpace(req.Username))
                     user.Username = req.Username;
@@ -202,6 +218,19 @@ namespace asset_monitoring.Pages
 
             if (string.IsNullOrWhiteSpace(req.Password) || req.Password.Length < 6)
                 return new JsonResult(new { success = false, message = "Password must be at least 6 characters" });
+
+            // Username uniqueness check — block duplicates and suggest alternatives
+            var (taken, suggestions) = await CheckUsernameAsync(req.Username.Trim());
+            if (taken)
+            {
+                Logger.Info("OnPostAddUserAsync: rejected duplicate username='{0}'", req.Username);
+                return new JsonResult(new
+                {
+                    success     = false,
+                    message     = $"Username '{req.Username}' is already taken",
+                    suggestions
+                });
+            }
 
             Logger.Info("OnPostAddUserAsync: name={0}, userType={1}", req.Name, req.UserType);
             try
@@ -433,6 +462,84 @@ namespace asset_monitoring.Pages
         {
             Logger.Info("Admin {0} logged out", Username);
             return LogoutAndRedirect();
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        //  USERNAME AVAILABILITY
+        // ═════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Live-check whether a username is available. Returns availability and,
+        /// if taken, a few suggested alternatives. Used by the Add/Edit User drawer.
+        /// </summary>
+        public async Task<IActionResult> OnGetCheckUsernameAsync(string username, int? excludeUserId = null)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return UnauthorizedJson();
+
+            if (string.IsNullOrWhiteSpace(username))
+                return new JsonResult(new { available = false, suggestions = Array.Empty<string>() });
+
+            var (taken, suggestions) = await CheckUsernameAsync(username.Trim(), excludeUserId);
+            return new JsonResult(new { available = !taken, suggestions });
+        }
+
+        /// <summary>
+        /// Returns (taken, suggestions). Uniqueness is checked across ALL users
+        /// (active + inactive) so a soft-deleted username cannot be silently
+        /// resurrected on a new row — admins can reactivate the original instead.
+        /// Suggestions try numeric increments: if the name ends in digits they
+        /// bump the trailing number; otherwise they append 1, 2, 3…
+        /// </summary>
+        private async Task<(bool taken, List<string> suggestions)> CheckUsernameAsync(
+            string username, int? excludeUserId = null)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return (false, new List<string>());
+
+            var query = _context.BdaUserMasters
+                .Where(u => u.Username != null && u.Username == username);
+            if (excludeUserId.HasValue)
+                query = query.Where(u => u.UserId != excludeUserId.Value);
+
+            var isTaken = await query.AnyAsync();
+            if (!isTaken)
+                return (false, new List<string>());
+
+            // Build candidate list, then filter against DB in one round-trip.
+            // Split trailing digits so "admin_1" suggests "admin_2", not "admin_11".
+            string baseName = username;
+            int startFrom   = 1;
+            var match = System.Text.RegularExpressions.Regex.Match(username, @"^(.*?)(\d+)$");
+            if (match.Success && int.TryParse(match.Groups[2].Value, out var parsed))
+            {
+                baseName  = match.Groups[1].Value;
+                startFrom = parsed + 1;
+            }
+
+            var candidates = new List<string>();
+            for (int i = startFrom; i < startFrom + 20 && candidates.Count < 15; i++)
+            {
+                var cand = baseName + i;
+                if (cand.Length <= 50)
+                    candidates.Add(cand);
+            }
+
+            var excludeId = excludeUserId ?? 0;
+            var taken = await _context.BdaUserMasters
+                .Where(u => u.Username != null
+                         && candidates.Contains(u.Username)
+                         && u.UserId != excludeId)
+                .Select(u => u.Username!)
+                .ToListAsync();
+
+            var takenSet = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
+            var available = candidates
+                .Where(c => !takenSet.Contains(c))
+                .Take(3)
+                .ToList();
+
+            return (true, available);
         }
 
         // ── Helper: standard 403 response ───────────────────────────────────
