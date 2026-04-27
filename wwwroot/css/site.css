@@ -562,7 +562,8 @@ html {
         height: 60vh;
     }
 
-    /* Table: hide Vendor, Operator, JE columns on mobile (Dashboard only) */
+    /* Table: hide Vendor, Operator, JE columns on mobile (Dashboard only).
+       JE/Operator info is surfaced in the pump detail modal instead. */
     #tableCol .table-dashboard th:nth-child(2),
     #tableCol .table-dashboard td:nth-child(2),
     #tableCol .table-dashboard th:nth-child(4),
@@ -570,6 +571,12 @@ html {
     #tableCol .table-dashboard th:nth-child(5),
     #tableCol .table-dashboard td:nth-child(5) {
         display: none;
+    }
+
+    /* Pump-detail info icon stays a comfortable tap target on mobile */
+    .table-dashboard .pump-info-btn {
+        font-size: 1rem;
+        line-height: 1;
     }
 
     /* Running Summary: hide Vendor, Location, OFF/Maint sub-columns on mobile */

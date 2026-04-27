@@ -118,10 +118,14 @@
                         @foreach (var p in Model.Pumps)
                         {
                             <tr data-pump-id="@p.PumpId">
-                                <td>
-                                    <button class="btn btn-link p-0 fw-semibold"
-                                            onclick="openPumpDetail('@p.PumpId', '@(p.VendorName ?? "")', '@(p.Location ?? "")', '@(p.Status ?? "OFF")')">
-                                        @p.PumpId
+                                <td class="text-nowrap">
+                                    <span class="fw-semibold">@p.PumpId</span>
+                                    <button type="button"
+                                            class="btn btn-link btn-sm p-0 ms-1 align-baseline pump-info-btn"
+                                            title="View pump details"
+                                            aria-label="View pump details"
+                                            onclick="openPumpDetail('@p.PumpId', '@(p.VendorName ?? "")', '@(p.Location ?? "")', '@(p.Status ?? "OFF")', '@(p.OperatorName ?? "")', '@(p.OperatorMobile ?? "")', '@(p.JeName ?? "")', '@(p.JeMobile ?? "")')">
+                                        <i class="bi bi-info-circle"></i>
                                     </button>
                                 </td>
                                 <td>@p.VendorName</td>
@@ -205,6 +209,22 @@
                     <div class="col-sm-4">
                         <div class="fw-semibold text-muted small">Status</div>
                         <div id="pdStatus"></div>
+                    </div>
+                </div>
+
+                <!-- Contacts row -->
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <div class="fw-semibold text-muted small">
+                            <i class="bi bi-person-fill me-1"></i>Operator
+                        </div>
+                        <div id="pdOperator">—</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="fw-semibold text-muted small">
+                            <i class="bi bi-person-vcard-fill me-1"></i>Junior Engineer
+                        </div>
+                        <div id="pdJe">—</div>
                     </div>
                 </div>
 
@@ -436,12 +456,12 @@
                             `.table-dashboard tbody tr[data-pump-id="${p.pumpId}"]`);
                         if (row) {
                             row.cells[5].innerHTML = statusHtml(p.status);
-                            // Keep openPumpDetail onclick in sync
+                            // Keep openPumpDetail onclick in sync (incl. operator + JE)
                             const btn = row.cells[0].querySelector('button');
                             if (btn) {
                                 const v = (s) => (s || '').replace(/'/g, "\\'");
                                 btn.setAttribute('onclick',
-                                    `openPumpDetail('${p.pumpId}','${v(p.vendorName)}','${v(p.location)}','${p.status}')`);
+                                    `openPumpDetail('${p.pumpId}','${v(p.vendorName)}','${v(p.location)}','${p.status}','${v(p.operatorName)}','${v(p.operatorMobile)}','${v(p.jeName)}','${v(p.jeMobile)}')`);
                             }
                         }
 
@@ -654,7 +674,8 @@
         })();
 
         // ── Pump detail modal ────────────────────────────────────────────────
-        function openPumpDetail(pumpId, vendor, location, status) {
+        function openPumpDetail(pumpId, vendor, location, status,
+                                opName, opMobile, jeName, jeMobile) {
             document.getElementById('pdPumpId').textContent  = pumpId;
             document.getElementById('pdVendor').textContent  = vendor   || '—';
             document.getElementById('pdLocation').textContent = location || '—';
@@ -667,6 +688,23 @@
             };
             document.getElementById('pdStatus').innerHTML =
                 statusBadgeMap[status] ?? '<span class="badge bg-secondary">UNKNOWN</span>';
+
+            // Operator + JE contact blocks (name + tap-to-call mobile)
+            const escHtml = s => (s == null) ? '' : String(s)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+            const renderContact = (name, mobile) => {
+                const safeMobile = (mobile || '').replace(/[^0-9+]/g, '');
+                if (!name && !safeMobile) return '<span class="text-muted">—</span>';
+                let html = '';
+                if (name)       html += `<div class="fw-semibold">${escHtml(name)}</div>`;
+                if (safeMobile) html += `<a href="tel:${safeMobile}" class="text-decoration-none small">`
+                                      +    `<i class="bi bi-telephone-fill me-1"></i>${escHtml(safeMobile)}`
+                                      +  `</a>`;
+                return html;
+            };
+            document.getElementById('pdOperator').innerHTML = renderContact(opName, opMobile);
+            document.getElementById('pdJe').innerHTML       = renderContact(jeName, jeMobile);
 
             // Show spinner, hide others
             document.getElementById('pdLogSpinner').classList.remove('d-none');
@@ -790,6 +828,15 @@
             }
             errEl.classList.add('d-none');
 
+            // ── iOS Safari popup-blocker workaround ─────────────────────────
+            // window.open() only honours the user-gesture token if it runs
+            // SYNCHRONOUSLY inside the click handler. After the await on the
+            // fetch below, the gesture is gone and Safari blocks the popup
+            // silently — that's why "Submit & Send WhatsApp" appeared dead on
+            // some iPhones. Open a blank tab now (still synchronous) and
+            // redirect it once the URL is back.
+            const waWindow = window.open('about:blank', '_blank');
+
             const token = document.querySelector('#complaintForm input[name="__RequestVerificationToken"]').value;
             const payload = {
                 PumpId:           document.getElementById('cmpPumpId').value,
@@ -817,15 +864,25 @@
                 const data = await res.json();
                 if (data.success) {
                     bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
-                    // Open WhatsApp with pre-filled message
+                    // Redirect the tab we opened earlier (works on iOS Safari)
                     if (data.whatsappUrl) {
-                        window.open(data.whatsappUrl, '_blank');
+                        if (waWindow && !waWindow.closed) {
+                            waWindow.location.href = data.whatsappUrl;
+                        } else {
+                            // Popup was blocked despite the workaround — fall
+                            // back to navigating the current tab.
+                            window.location.href = data.whatsappUrl;
+                        }
+                    } else if (waWindow) {
+                        waWindow.close();
                     }
                 } else {
+                    if (waWindow) waWindow.close();
                     errEl.textContent = data.message || 'Failed to submit complaint.';
                     errEl.classList.remove('d-none');
                 }
             } catch (err) {
+                if (waWindow) waWindow.close();
                 console.error('submitComplaint failed', err);
                 errEl.textContent = 'Error submitting complaint. Please try again.';
                 errEl.classList.remove('d-none');
