@@ -234,12 +234,16 @@ function openSummaryPumpDetail(pumpId, vendor, location, status) {
             const tbody = document.getElementById('spLogBody');
             const esc = s => (s == null || s === '') ? '—' : String(s)
                 .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            data.logs.forEach(l => {
+            data.logs.forEach((l, i) => {
                 const fmt = dt => dt ? new Date(dt).toLocaleString('en-IN') : '—';
                 const dur = l.durationMinutes != null ? `${l.durationMinutes} min` : '—';
+                // Serial number per pump in chronological order:
+                // #1 = oldest event, #N = most recent. Rows are
+                // rendered newest-first, so the bottom row gets #1.
+                const serial = data.logs.length - i;
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr>
-                        <td class="text-muted small">${esc(l.logId)}</td>
+                        <td class="text-muted small">${serial}</td>
                         <td>${esc(l.oldStatus)}</td>
                         <td><strong>${esc(l.newStatus)}</strong></td>
                         <td class="text-nowrap small">${fmt(l.startTime)}</td>
