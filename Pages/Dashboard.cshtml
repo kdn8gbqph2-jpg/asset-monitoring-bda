@@ -25,7 +25,10 @@
             <i class="bi bi-file-earmark-spreadsheet"></i> <span class="btn-nav-label">CSV</span>
         </a>
     </div>
-    <div class="nav-title dashboard-title">Monsoon Pump Dashboard</div>
+    <div class="nav-title-wrap">
+        <div class="nav-title dashboard-title">Monsoon Pump Dashboard</div>
+        <div class="dashboard-tagline">Real-time pump status &mdash; operator-logged, engineer-supervised.</div>
+    </div>
     <div class="nav-actions">
         <button class="btn-nav btn-nav-primary"
                 data-bs-toggle="modal"
@@ -125,7 +128,7 @@
                                             title="View pump details"
                                             aria-label="View pump details"
                                             onclick="openPumpDetail('@p.PumpId', '@(p.VendorName ?? "")', '@(p.Location ?? "")', '@(p.Status ?? "OFF")', '@(p.OperatorName ?? "")', '@(p.OperatorMobile ?? "")', '@(p.JeName ?? "")', '@(p.JeMobile ?? "")')">
-                                        <i class="bi bi-info-circle"></i>
+                                        <i class="bi bi-info-circle-fill"></i>
                                     </button>
                                 </td>
                                 <td>@p.VendorName</td>
@@ -733,9 +736,13 @@
                     data.logs.forEach((l, i) => {
                         const fmt = dt => dt ? new Date(dt).toLocaleString('en-IN') : '—';
                         const dur = l.durationMinutes != null ? `${l.durationMinutes} min` : '—';
+                        // Serial number per pump in chronological order:
+                        // #1 = oldest event, #N = most recent. Rows are
+                        // rendered newest-first, so the bottom row gets #1.
+                        const serial = data.logs.length - i;
                         tbody.insertAdjacentHTML('beforeend', `
                             <tr>
-                                <td class="text-muted small">${esc(l.logId)}</td>
+                                <td class="text-muted small">${serial}</td>
                                 <td>${esc(l.oldStatus)}</td>
                                 <td><strong>${esc(l.newStatus)}</strong></td>
                                 <td class="text-nowrap small">${fmt(l.startTime)}</td>

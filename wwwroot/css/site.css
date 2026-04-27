@@ -456,9 +456,29 @@ html {
     font-size: 1.75rem;
 }
 
+/* Title block wraps the H1 and the tagline so they stack vertically
+   inside the flex navbar without disturbing the side action groups. */
+.nav-title-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+}
+
+.dashboard-tagline {
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.72);
+    letter-spacing: 0.01em;
+    margin-top: 0.15rem;
+}
+
 @media (max-width: 768px) {
     .dashboard-title {
         font-size: 1.15rem;
+    }
+    .dashboard-tagline {
+        font-size: 0.72rem;
     }
 }
 
@@ -505,12 +525,18 @@ html {
         padding: 0.5rem 0.75rem;
         gap: 0.4rem;
     }
-    .dash-navbar .nav-title {
+    .dash-navbar .nav-title-wrap {
         order: -1;
         width: 100%;
+        margin-bottom: 0.25rem;
+    }
+    .dash-navbar .nav-title {
         text-align: center;
         font-size: 1.1rem;
-        margin-bottom: 0.25rem;
+    }
+    .dash-navbar .dashboard-tagline {
+        text-align: center;
+        font-size: 0.7rem;
     }
     .dash-navbar .nav-actions {
         gap: 0.4rem;
