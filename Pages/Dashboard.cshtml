@@ -358,6 +358,16 @@
                         <label class="form-label">Password</label>
                         <input asp-for="LoginModel.Password" type="password" class="form-control" />
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Solve: <strong>@Model.CaptchaQuestion = ?</strong>
+                        </label>
+                        <input asp-for="LoginModel.CaptchaAnswer"
+                               class="form-control"
+                               inputmode="numeric"
+                               autocomplete="off"
+                               required />
+                    </div>
                     @if (Model.LoginMessage != null)
                     {
                         <div class="alert alert-danger">

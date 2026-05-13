@@ -27,6 +27,7 @@ namespace asset_monitoring.Pages
         [BindProperty]
         public LoginInputModel LoginModel { get; set; } = new();
         public string? LoginMessage { get; private set; }
+        public string CaptchaQuestion { get; private set; } = "";
 
         // ── Map config ──────────────────────────────────────────────────────
         public decimal MapCenterLatitude { get; private set; }
@@ -60,7 +61,13 @@ namespace asset_monitoring.Pages
 
         public async Task OnGetAsync()
         {
-            Logger.Info("Dashboard OnGetAsync started");
+            await LoadDashboardDataAsync();
+            GenerateLoginCaptcha();
+        }
+
+        private async Task LoadDashboardDataAsync()
+        {
+            Logger.Info("Dashboard data load started");
             try
             {
                 var pumpData = await _pumpService.GetPumpsAsync();
@@ -93,7 +100,7 @@ namespace asset_monitoring.Pages
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Dashboard OnGetAsync failed");
+                Logger.Error(ex, "Dashboard data load failed");
                 Pumps = new List<PumpRow>();
             }
         }
@@ -104,7 +111,7 @@ namespace asset_monitoring.Pages
             try
             {
                 _pumpService.InvalidateCache();
-                await OnGetAsync();
+                await LoadDashboardDataAsync();
                 return new JsonResult(new
                 {
                     totalPumps       = TotalPumps,
@@ -283,16 +290,25 @@ namespace asset_monitoring.Pages
                 string.IsNullOrWhiteSpace(LoginModel.Password))
             {
                 LoginMessage = "Username and password are required.";
-                await OnGetAsync();
-                return Page();
+                return await RenderLoginFailureAsync();
             }
 
             if (IsLoginRateLimited(ip))
             {
                 Logger.Warn("Login rate-limited for IP: {0}", ip);
                 LoginMessage = "Too many failed attempts. Please try again in 15 minutes.";
-                await OnGetAsync();
-                return Page();
+                return await RenderLoginFailureAsync();
+            }
+
+            var expectedCaptcha = HttpContext.Session.GetInt32("LoginCaptchaAnswer");
+            if (expectedCaptcha is null ||
+                !int.TryParse(LoginModel.CaptchaAnswer, out var postedCaptcha) ||
+                postedCaptcha != expectedCaptcha.Value)
+            {
+                RecordFailedLogin(ip);
+                Logger.Warn("Login failed (wrong captcha) for user: {0}", LoginModel.Username);
+                LoginMessage = "Incorrect captcha. Please try again.";
+                return await RenderLoginFailureAsync();
             }
 
             if (!_userCache.Users.TryGetValue(LoginModel.Username, out var user))
@@ -300,8 +316,7 @@ namespace asset_monitoring.Pages
                 RecordFailedLogin(ip);
                 Logger.Warn("Login failed (user not found): {0}", LoginModel.Username);
                 LoginMessage = "Invalid username or password";
-                await OnGetAsync();
-                return Page();
+                return await RenderLoginFailureAsync();
             }
 
             if (!VerifyAndUpgradePassword(user, LoginModel.Password))
@@ -309,8 +324,7 @@ namespace asset_monitoring.Pages
                 RecordFailedLogin(ip);
                 Logger.Warn("Login failed (wrong password) for user: {0}", LoginModel.Username);
                 LoginMessage = "Invalid username or password";
-                await OnGetAsync();
-                return Page();
+                return await RenderLoginFailureAsync();
             }
 
             // Success — set session and redirect by role
@@ -365,6 +379,28 @@ namespace asset_monitoring.Pages
         private static void ClearLoginAttempts(string ip)
         {
             lock (_loginLock) { _loginAttempts.Remove(ip); }
+        }
+
+        // ── Login captcha ───────────────────────────────────────────────────
+
+        private void GenerateLoginCaptcha()
+        {
+            int a = Random.Shared.Next(1, 10);
+            int b = Random.Shared.Next(1, 10);
+            bool subtract = Random.Shared.Next(0, 2) == 1 && a >= b;
+            int answer = subtract ? a - b : a + b;
+            CaptchaQuestion = $"{a} {(subtract ? "−" : "+")} {b}";
+            HttpContext.Session.SetInt32("LoginCaptchaAnswer", answer);
+        }
+
+        private async Task<IActionResult> RenderLoginFailureAsync()
+        {
+            // Clear the wrong captcha answer so the user isn't left
+            // staring at a stale value against a freshly-generated question.
+            LoginModel.CaptchaAnswer = "";
+            await LoadDashboardDataAsync();
+            GenerateLoginCaptcha();
+            return Page();
         }
 
         // ── BCrypt verify + plain-text auto-upgrade ─────────────────────────
@@ -439,6 +475,7 @@ namespace asset_monitoring.Pages
         {
             public string Username { get; set; } = "";
             public string Password { get; set; } = "";
+            public string CaptchaAnswer { get; set; } = "";
         }
     }
 }
