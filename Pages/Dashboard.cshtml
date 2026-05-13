@@ -359,9 +359,10 @@
                         <input asp-for="LoginModel.Password" type="password" class="form-control" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">
+                        <label class="form-label fw-semibold">Are You Human?</label>
+                        <div class="small text-muted mb-1">
                             Solve: <strong>@Model.CaptchaQuestion = ?</strong>
-                        </label>
+                        </div>
                         <input asp-for="LoginModel.CaptchaAnswer"
                                class="form-control"
                                inputmode="numeric"
