@@ -465,17 +465,35 @@ namespace asset_monitoring.Services
             }
         }
 
-        // ── Pump Running Summary (today + this month run hours per pump) ──────
-        public async Task<List<PumpRunningSummaryDto>> GetPumpRunningSummaryAsync(
-            int? userId = null, string? userType = "ADMIN")
+        // ── Pump Running Summary (today + selected month run hours per pump) ──
+        // When year/month are null, defaults to the current IST month (TODAY columns
+        // are populated). When a past month is requested, TODAY columns will be 0 —
+        // the UI hides them in that case (today has no meaning for a past month).
+        public async Task<PumpRunningSummaryResult> GetPumpRunningSummaryAsync(
+            int? userId = null, string? userType = "ADMIN",
+            int? year = null, int? month = null)
         {
-            Logger.Debug("GetPumpRunningSummaryAsync: userId={0}, userType={1}", userId, userType);
+            Logger.Debug("GetPumpRunningSummaryAsync: userId={0}, userType={1}, year={2}, month={3}",
+                userId, userType, year, month);
             try
             {
-                var nowUtc = DateTime.UtcNow;
-                var nowIst    = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, Ist);
-                var todayIst  = nowIst.Date;
-                var monthStartIst = new DateTime(nowIst.Year, nowIst.Month, 1);
+                var nowUtc   = DateTime.UtcNow;
+                var nowIst   = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, Ist);
+                var todayIst = nowIst.Date;
+
+                // Resolve & clamp the selected period — defaults to current IST month.
+                // Clamp defends against malformed query params (e.g. month=99, year=1).
+                int selYear  = year  ?? nowIst.Year;
+                int selMonth = month ?? nowIst.Month;
+                if (selMonth < 1 || selMonth > 12) selMonth = nowIst.Month;
+                if (selYear  < 2000 || selYear > nowIst.Year + 1) selYear = nowIst.Year;
+
+                var periodStart = new DateTime(selYear, selMonth, 1);
+                var periodEnd   = periodStart.AddMonths(1); // exclusive
+                bool isCurrentMonth = selYear == nowIst.Year && selMonth == nowIst.Month;
+
+                // Don't query summaries for future dates — cap the range at today + 1.
+                var rangeEnd = periodEnd > todayIst.AddDays(1) ? todayIst.AddDays(1) : periodEnd;
 
                 // Mobile filter — OPERATOR filters by operator_mobile, JE filters by je_mobile
                 string? operatorMobile = null;
@@ -517,11 +535,11 @@ namespace asset_monitoring.Services
 
                 var pumpIds = pumpData.Select(p => p.PumpId).ToList();
 
-                // ── Pull pre-computed daily summaries for this month ─────────
+                // ── Pull pre-computed daily summaries for the selected month ───
                 var dailySummaries = await _db.PumpDailySummaries
                     .Where(s => pumpIds.Contains(s.PumpId)
-                             && s.SummaryDate >= monthStartIst
-                             && s.SummaryDate <= todayIst)
+                             && s.SummaryDate >= periodStart
+                             && s.SummaryDate < rangeEnd)
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -537,17 +555,21 @@ namespace asset_monitoring.Services
                     .ToListAsync())
                     .ToDictionary(u => u.MobileNumber!, u => u.Name ?? "");
 
-                var result = pumpData.Select(p =>
+                var rows = pumpData.Select(p =>
                 {
                     var pumpSummaries = dailySummaries.Where(s => s.PumpId == p.PumpId).ToList();
 
-                    // Today's breakdown (single row for today)
-                    var todaySummary = pumpSummaries.FirstOrDefault(s => s.SummaryDate == todayIst);
-                    int todayOn   = todaySummary?.OnMinutes          ?? 0;
-                    int todayOff  = todaySummary?.OffMinutes         ?? 0;
-                    int todayMnt  = todaySummary?.MaintenanceMinutes ?? 0;
+                    // Today's breakdown — only meaningful when viewing the current month.
+                    int todayOn = 0, todayOff = 0, todayMnt = 0;
+                    if (isCurrentMonth)
+                    {
+                        var todaySummary = pumpSummaries.FirstOrDefault(s => s.SummaryDate == todayIst);
+                        todayOn  = todaySummary?.OnMinutes          ?? 0;
+                        todayOff = todaySummary?.OffMinutes         ?? 0;
+                        todayMnt = todaySummary?.MaintenanceMinutes ?? 0;
+                    }
 
-                    // This month's breakdown (sum all days in month)
+                    // Selected month's breakdown (sum across all days in the month)
                     int monthOn   = pumpSummaries.Sum(s => s.OnMinutes);
                     int monthOff  = pumpSummaries.Sum(s => s.OffMinutes);
                     int monthMnt  = pumpSummaries.Sum(s => s.MaintenanceMinutes);
@@ -574,8 +596,16 @@ namespace asset_monitoring.Services
                     };
                 }).ToList();
 
-                Logger.Debug("GetPumpRunningSummaryAsync: summary built for {0} pumps", result.Count);
-                return result;
+                Logger.Debug("GetPumpRunningSummaryAsync: summary built for {0} pumps (period={1:yyyy-MM})",
+                    rows.Count, periodStart);
+
+                return new PumpRunningSummaryResult
+                {
+                    Rows           = rows,
+                    Year           = selYear,
+                    Month          = selMonth,
+                    IsCurrentMonth = isCurrentMonth
+                };
             }
             catch (Exception ex)
             {
@@ -678,17 +708,35 @@ namespace asset_monitoring.Services
         public string? Location { get; set; }
         public string? Status { get; set; }
 
-        // Today breakdown
+        // Today breakdown (populated only when the summary represents the current month)
         public int TodayRunMinutes { get; set; }
         public int TodayOffMinutes { get; set; }
         public int TodayMaintenanceMinutes { get; set; }
 
-        // This month breakdown
+        // Selected month breakdown (current month by default; can be any past month)
         public int MonthRunMinutes { get; set; }
         public int MonthOffMinutes { get; set; }
         public int MonthMaintenanceMinutes { get; set; }
 
         public DateTime LastUpdated { get; set; }
         public string? OperatorName { get; set; }
+    }
+
+    /// <summary>
+    /// Wrapper around the running summary rows plus the period they cover, so the
+    /// UI knows which month to label the table with and whether to show TODAY columns.
+    /// </summary>
+    public class PumpRunningSummaryResult
+    {
+        public List<PumpRunningSummaryDto> Rows { get; set; } = new();
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public bool IsCurrentMonth { get; set; }
+
+        /// <summary>e.g. "April 2025"</summary>
+        public string MonthLabel => new DateTime(Year, Month, 1).ToString("MMMM yyyy");
+
+        /// <summary>Matches the value format of HTML &lt;input type="month"&gt; (e.g. "2025-04").</summary>
+        public string IsoMonthValue => $"{Year:D4}-{Month:D2}";
     }
 }

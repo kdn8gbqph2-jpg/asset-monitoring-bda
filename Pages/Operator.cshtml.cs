@@ -13,7 +13,7 @@ namespace asset_monitoring.Pages
         private readonly ReportExportService _reportExportService;
 
         public List<DashboardPumpDto> Pumps { get; set; } = new();
-        public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
+        public PumpRunningSummaryResult RunningSummary { get; set; } = new();
         public string? LoggedInUserName { get; set; }
 
         public OperatorModel(PumpDashboardService pumpDashboardService, ReportExportService reportExportService)
@@ -22,7 +22,7 @@ namespace asset_monitoring.Pages
             _reportExportService  = reportExportService;
         }
 
-        public async Task<IActionResult> OnGetAsync()
+        public async Task<IActionResult> OnGetAsync(int? summaryYear = null, int? summaryMonth = null)
         {
             if (!IsLoggedIn)
             {
@@ -40,7 +40,8 @@ namespace asset_monitoring.Pages
             Logger.Info("OnGetAsync: operator page loaded for userId={0}, user={1}", UserId, Username);
 
             Pumps          = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
-            RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync(UserId, UserType);
+            RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync(
+                UserId, UserType, summaryYear, summaryMonth);
 
             Logger.Debug("OnGetAsync: loaded {0} pumps for operator userId={1}", Pumps.Count, UserId);
             return Page();
@@ -106,6 +107,38 @@ namespace asset_monitoring.Pages
             var pumps = await _pumpDashboardService.GetPumpsAsync(UserId, UserType);
             Logger.Info("OnGetDownloadReport: exporting {0} pumps as CSV, operator userId={1}", pumps.Count, UserId);
             return _reportExportService.ExportPumpsAsCsv(pumps);
+        }
+
+        // ── Running Summary downloads (CSV / XLSX / PDF) ─────────────────────
+        public Task<IActionResult> OnGetDownloadRunningSummaryCsvAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("CSV", summaryYear, summaryMonth);
+        public Task<IActionResult> OnGetDownloadRunningSummaryXlsxAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("XLSX", summaryYear, summaryMonth);
+        public Task<IActionResult> OnGetDownloadRunningSummaryPdfAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("PDF", summaryYear, summaryMonth);
+
+        private async Task<IActionResult> ExportRunningSummary(string format, int? year, int? month)
+        {
+            if (!IsLoggedIn || (UserType != "OPERATOR" && UserType != "ADMIN"))
+                return RedirectToPage("/Index");
+            try
+            {
+                var summary = await _pumpDashboardService.GetPumpRunningSummaryAsync(
+                    UserId, UserType, year, month);
+                Logger.Info("Operator ExportRunningSummary({0}): {1} rows, period={2}-{3}, userId={4}",
+                    format, summary.Rows.Count, summary.Year, summary.Month, UserId);
+                return format switch
+                {
+                    "XLSX" => _reportExportService.ExportRunningSummaryAsXlsx(summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                    "PDF"  => _reportExportService.ExportRunningSummaryAsPdf (summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                    _      => _reportExportService.ExportRunningSummaryAsCsv (summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Operator ExportRunningSummary({0}) failed", format);
+                return StatusCode(500, $"Failed to generate running summary {format}");
+            }
         }
 
         public IActionResult OnPostLogout()

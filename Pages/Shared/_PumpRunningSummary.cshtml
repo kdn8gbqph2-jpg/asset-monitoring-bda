@@ -1,4 +1,4 @@
-@model List<asset_monitoring.Services.PumpRunningSummaryDto>
+@model asset_monitoring.Services.PumpRunningSummaryResult
 @{
     var ist = TimeZoneInfo.FindSystemTimeZoneById(
         OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
@@ -14,18 +14,74 @@
     string ToIst(DateTime utc) =>
         TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), ist)
             .ToString("dd MMM, hh:mm tt");
+
+    // Earliest selectable month for the picker. Anchored well in the past so
+    // historical browsing is unconstrained; the service clamps invalid input.
+    var pickerMin = "2024-01";
+    var pickerMax = $"{DateTime.Now.Year:D4}-{DateTime.Now.Month:D2}";
+
+    var rows = Model?.Rows ?? new List<asset_monitoring.Services.PumpRunningSummaryDto>();
+    var monthLabel = Model?.MonthLabel ?? DateTime.Now.ToString("MMMM yyyy");
+    var isCurrent  = Model?.IsCurrentMonth ?? true;
+    var isoMonth   = Model?.IsoMonthValue ?? $"{DateTime.Now.Year:D4}-{DateTime.Now.Month:D2}";
+    var selYear    = Model?.Year  ?? DateTime.Now.Year;
+    var selMonth   = Model?.Month ?? DateTime.Now.Month;
+
+    // Colspan for the empty-state row: 4 base + 3 today (if current) + 3 month + 1 last updated
+    var emptyColspan = isCurrent ? 11 : 8;
 }
 
 <div class="card mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap" style="gap: 0.75rem;">
         <h5 class="fw-semibold text-primary m-0">
             <i class="bi bi-bar-chart-line-fill icon-title"></i>
             Pump Running Summary
         </h5>
-        <span class="text-muted small">
-            <i class="bi bi-calendar-day me-1"></i>@DateTime.Now.ToString("dd MMM yyyy")
-        </span>
+        <div class="d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+            <label for="summaryMonthPicker" class="form-label small text-muted m-0">
+                <i class="bi bi-calendar3 me-1"></i>Month
+            </label>
+            <input type="month"
+                   id="summaryMonthPicker"
+                   class="form-control form-control-sm"
+                   style="width: 11rem;"
+                   value="@isoMonth"
+                   min="@pickerMin"
+                   max="@pickerMax" />
+            <div class="btn-group btn-group-sm" role="group" aria-label="Export running summary">
+                <a class="btn btn-outline-success"
+                   title="Download Excel"
+                   href="?handler=DownloadRunningSummaryXlsx&summaryYear=@selYear&summaryMonth=@selMonth">
+                    <i class="bi bi-file-earmark-excel"></i>
+                    <span class="d-none d-sm-inline ms-1">Excel</span>
+                </a>
+                <a class="btn btn-outline-danger"
+                   title="Download PDF"
+                   href="?handler=DownloadRunningSummaryPdf&summaryYear=@selYear&summaryMonth=@selMonth">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    <span class="d-none d-sm-inline ms-1">PDF</span>
+                </a>
+                <a class="btn btn-outline-secondary"
+                   title="Download CSV"
+                   href="?handler=DownloadRunningSummaryCsv&summaryYear=@selYear&summaryMonth=@selMonth">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                    <span class="d-none d-sm-inline ms-1">CSV</span>
+                </a>
+            </div>
+        </div>
     </div>
+
+    @if (!isCurrent)
+    {
+        <div class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center" style="gap: 0.4rem;">
+            <i class="bi bi-clock-history"></i>
+            <span>
+                Viewing historical data for <strong>@monthLabel</strong>. Status and Operator
+                columns reflect the pump's <em>current</em> values.
+            </span>
+        </div>
+    }
+
     <div class="table-responsive">
         <table class="table table-dashboard summary-table align-middle text-center">
             <thead>
@@ -34,35 +90,41 @@
                     <th rowspan="2" class="align-middle text-start col-hide-mobile">VENDOR</th>
                     <th rowspan="2" class="align-middle text-start col-hide-mobile">LOCATION</th>
                     <th rowspan="2" class="align-middle">STATUS</th>
-                    <th colspan="3" class="text-center border-bottom-0 d-none d-sm-table-cell"
-                        style="background:#e8f5e9; color:#2e7d32;">
-                        <i class="bi bi-sun me-1"></i>TODAY
-                    </th>
-                    <th class="text-center border-bottom-0 d-sm-none"
-                        style="background:#e8f5e9; color:#2e7d32;">
-                        <i class="bi bi-sun me-1"></i>TODAY
-                    </th>
+                    @if (isCurrent)
+                    {
+                        <th colspan="3" class="text-center border-bottom-0 d-none d-sm-table-cell"
+                            style="background:#e8f5e9; color:#2e7d32;">
+                            <i class="bi bi-sun me-1"></i>TODAY
+                        </th>
+                        <th class="text-center border-bottom-0 d-sm-none"
+                            style="background:#e8f5e9; color:#2e7d32;">
+                            <i class="bi bi-sun me-1"></i>TODAY
+                        </th>
+                    }
                     <th colspan="3" class="text-center border-bottom-0 d-none d-sm-table-cell"
                         style="background:#e3f2fd; color:#1565c0;">
-                        <i class="bi bi-calendar3 me-1"></i>THIS MONTH
+                        <i class="bi bi-calendar3 me-1"></i>@monthLabel.ToUpper()
                     </th>
                     <th class="text-center border-bottom-0 d-sm-none"
                         style="background:#e3f2fd; color:#1565c0;">
-                        <i class="bi bi-calendar3 me-1"></i>MONTH
+                        <i class="bi bi-calendar3 me-1"></i>@monthLabel
                     </th>
                     <th rowspan="2" class="align-middle col-hide-mobile">LAST UPDATED</th>
                 </tr>
                 <tr>
-                    @* Today sub-columns *@
-                    <th style="background:#e8f5e9; font-size:0.75rem;">
-                        <i class="bi bi-play-circle text-success"></i> Running
-                    </th>
-                    <th class="col-hide-mobile" style="background:#e8f5e9; font-size:0.75rem;">
-                        <i class="bi bi-stop-circle text-danger"></i> OFF
-                    </th>
-                    <th class="col-hide-mobile" style="background:#e8f5e9; font-size:0.75rem;">
-                        <i class="bi bi-wrench text-warning"></i> Maint.
-                    </th>
+                    @if (isCurrent)
+                    {
+                        @* Today sub-columns *@
+                        <th style="background:#e8f5e9; font-size:0.75rem;">
+                            <i class="bi bi-play-circle text-success"></i> Running
+                        </th>
+                        <th class="col-hide-mobile" style="background:#e8f5e9; font-size:0.75rem;">
+                            <i class="bi bi-stop-circle text-danger"></i> OFF
+                        </th>
+                        <th class="col-hide-mobile" style="background:#e8f5e9; font-size:0.75rem;">
+                            <i class="bi bi-wrench text-warning"></i> Maint.
+                        </th>
+                    }
                     @* Month sub-columns *@
                     <th style="background:#e3f2fd; font-size:0.75rem;">
                         <i class="bi bi-play-circle text-success"></i> Running
@@ -76,15 +138,15 @@
                 </tr>
             </thead>
             <tbody>
-            @if (Model == null || !Model.Any())
+            @if (rows == null || !rows.Any())
             {
                 <tr>
-                    <td colspan="11" class="text-center text-muted py-3">No data available</td>
+                    <td colspan="@emptyColspan" class="text-center text-muted py-3">No data available</td>
                 </tr>
             }
             else
             {
-                foreach (var item in Model)
+                foreach (var item in rows)
                 {
                     <tr>
                         <td class="fw-semibold text-start">
@@ -109,22 +171,25 @@
                                 <span class="badge-status-off">OFF</span>
                             }
                         </td>
-                        @* ── Today columns ── *@
-                        <td>
-                            <span class="fw-semibold @(item.TodayRunMinutes > 0 ? "text-success" : "text-muted")">
-                                @FormatRunTime(item.TodayRunMinutes)
-                            </span>
-                        </td>
-                        <td class="col-hide-mobile">
-                            <span class="fw-semibold @(item.TodayOffMinutes > 0 ? "text-danger" : "text-muted")">
-                                @FormatRunTime(item.TodayOffMinutes)
-                            </span>
-                        </td>
-                        <td class="col-hide-mobile">
-                            <span class="fw-semibold @(item.TodayMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
-                                @FormatRunTime(item.TodayMaintenanceMinutes)
-                            </span>
-                        </td>
+                        @if (isCurrent)
+                        {
+                            @* ── Today columns ── *@
+                            <td>
+                                <span class="fw-semibold @(item.TodayRunMinutes > 0 ? "text-success" : "text-muted")">
+                                    @FormatRunTime(item.TodayRunMinutes)
+                                </span>
+                            </td>
+                            <td class="col-hide-mobile">
+                                <span class="fw-semibold @(item.TodayOffMinutes > 0 ? "text-danger" : "text-muted")">
+                                    @FormatRunTime(item.TodayOffMinutes)
+                                </span>
+                            </td>
+                            <td class="col-hide-mobile">
+                                <span class="fw-semibold @(item.TodayMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
+                                    @FormatRunTime(item.TodayMaintenanceMinutes)
+                                </span>
+                            </td>
+                        }
                         @* ── Month columns ── *@
                         <td>
                             <span class="fw-semibold @(item.MonthRunMinutes > 0 ? "text-success" : "text-muted")">
@@ -202,6 +267,21 @@
 </div>
 
 <script>
+// ── Month picker: navigate to selected period ────────────────────────────
+(function () {
+    const picker = document.getElementById('summaryMonthPicker');
+    if (!picker) return;
+    picker.addEventListener('change', () => {
+        const v = picker.value;          // "YYYY-MM"
+        if (!v || !/^\d{4}-\d{2}$/.test(v)) return;
+        const [y, m] = v.split('-');
+        const url = new URL(window.location.href);
+        url.searchParams.set('summaryYear', y);
+        url.searchParams.set('summaryMonth', String(parseInt(m, 10))); // strip leading zero
+        window.location.href = url.toString();
+    });
+})();
+
 function openSummaryPumpDetail(pumpId, vendor, location, status) {
     document.getElementById('spPumpId').textContent  = pumpId;
     document.getElementById('spVendor').textContent  = vendor  || '—';

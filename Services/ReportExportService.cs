@@ -198,6 +198,274 @@ namespace asset_monitoring.Services
         }
 
         // ══════════════════════════════════════════════════════════════════════
+        //  PUMP RUNNING SUMMARY EXPORTS
+        //  Same trio of formats as the pump report. TODAY columns are emitted only
+        //  when the requested period is the current month — for past months they
+        //  would be all zeros, so we omit them to keep the report readable.
+        // ══════════════════════════════════════════════════════════════════════
+
+        private static string RunningSummaryFileBase(int year, int month) =>
+            $"PumpRunningSummary_{year:D4}-{month:D2}";
+
+        private static string FormatMinutes(int minutes)
+        {
+            if (minutes <= 0) return "—";
+            return minutes >= 60 ? $"{minutes / 60}h {minutes % 60}m" : $"{minutes}m";
+        }
+
+        // ── Running Summary CSV ──────────────────────────────────────────────
+        public FileContentResult ExportRunningSummaryAsCsv(
+            List<PumpRunningSummaryDto> rows, int year, int month, bool isCurrentMonth)
+        {
+            Logger.Info("ExportRunningSummaryAsCsv: {0} rows, period={1:D4}-{2:D2}, isCurrentMonth={3}",
+                rows.Count, year, month, isCurrentMonth);
+
+            var monthLabel = new DateTime(year, month, 1).ToString("MMMM yyyy");
+            var sb = new StringBuilder();
+
+            if (isCurrentMonth)
+            {
+                sb.AppendLine("PumpId,Vendor,Location,Operator,Status," +
+                              "TodayRun(min),TodayOff(min),TodayMaint(min)," +
+                              $"\"{monthLabel} Run(min)\",\"{monthLabel} Off(min)\",\"{monthLabel} Maint(min)\"," +
+                              "LastUpdated");
+                foreach (var r in rows)
+                {
+                    sb.AppendLine(string.Join(",", new[]
+                    {
+                        CsvEscape(r.PumpId), CsvEscape(r.VendorName), CsvEscape(r.Location),
+                        CsvEscape(r.OperatorName), CsvEscape(r.Status),
+                        r.TodayRunMinutes.ToString(), r.TodayOffMinutes.ToString(), r.TodayMaintenanceMinutes.ToString(),
+                        r.MonthRunMinutes.ToString(), r.MonthOffMinutes.ToString(), r.MonthMaintenanceMinutes.ToString(),
+                        r.LastUpdated.ToString("yyyy-MM-dd HH:mm:ss")
+                    }));
+                }
+            }
+            else
+            {
+                sb.AppendLine("PumpId,Vendor,Location,Operator,Status," +
+                              $"\"{monthLabel} Run(min)\",\"{monthLabel} Off(min)\",\"{monthLabel} Maint(min)\"," +
+                              "LastUpdated");
+                foreach (var r in rows)
+                {
+                    sb.AppendLine(string.Join(",", new[]
+                    {
+                        CsvEscape(r.PumpId), CsvEscape(r.VendorName), CsvEscape(r.Location),
+                        CsvEscape(r.OperatorName), CsvEscape(r.Status),
+                        r.MonthRunMinutes.ToString(), r.MonthOffMinutes.ToString(), r.MonthMaintenanceMinutes.ToString(),
+                        r.LastUpdated.ToString("yyyy-MM-dd HH:mm:ss")
+                    }));
+                }
+            }
+
+            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            var fileName = $"{RunningSummaryFileBase(year, month)}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            return new FileContentResult(bytes, "text/csv") { FileDownloadName = fileName };
+        }
+
+        // ── Running Summary XLSX ─────────────────────────────────────────────
+        public FileContentResult ExportRunningSummaryAsXlsx(
+            List<PumpRunningSummaryDto> rows, int year, int month, bool isCurrentMonth)
+        {
+            Logger.Info("ExportRunningSummaryAsXlsx: {0} rows, period={1:D4}-{2:D2}, isCurrentMonth={3}",
+                rows.Count, year, month, isCurrentMonth);
+
+            var monthLabel = new DateTime(year, month, 1).ToString("MMMM yyyy");
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add($"Summary {year:D4}-{month:D2}");
+
+            // Build headers conditionally — TODAY group only for the current month.
+            var headers = new List<string> { "Pump ID", "Vendor", "Location", "Operator", "Status" };
+            if (isCurrentMonth)
+                headers.AddRange(new[] { "Today Run (min)", "Today Off (min)", "Today Maint. (min)" });
+            headers.AddRange(new[]
+            {
+                $"{monthLabel} Run (min)",
+                $"{monthLabel} Off (min)",
+                $"{monthLabel} Maint. (min)",
+                "Last Updated"
+            });
+
+            for (int i = 0; i < headers.Count; i++)
+            {
+                var cell = ws.Cell(1, i + 1);
+                cell.Value = headers[i];
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#2563EB");
+                cell.Style.Font.FontColor = XLColor.White;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            }
+
+            int statusCol = 5;
+            int lastUpdatedCol = headers.Count;
+
+            for (int r = 0; r < rows.Count; r++)
+            {
+                var p = rows[r];
+                int row = r + 2;
+                int col = 1;
+                ws.Cell(row, col++).Value = p.PumpId;
+                ws.Cell(row, col++).Value = p.VendorName ?? "";
+                ws.Cell(row, col++).Value = p.Location   ?? "";
+                ws.Cell(row, col++).Value = p.OperatorName ?? "";
+                ws.Cell(row, col++).Value = p.Status     ?? "";
+                if (isCurrentMonth)
+                {
+                    ws.Cell(row, col++).Value = p.TodayRunMinutes;
+                    ws.Cell(row, col++).Value = p.TodayOffMinutes;
+                    ws.Cell(row, col++).Value = p.TodayMaintenanceMinutes;
+                }
+                ws.Cell(row, col++).Value = p.MonthRunMinutes;
+                ws.Cell(row, col++).Value = p.MonthOffMinutes;
+                ws.Cell(row, col++).Value = p.MonthMaintenanceMinutes;
+                ws.Cell(row, col++).Value = p.LastUpdated.ToString("yyyy-MM-dd HH:mm:ss");
+
+                if (r % 2 == 1)
+                    ws.Row(row).Style.Fill.BackgroundColor = XLColor.FromHtml("#F0F6FF");
+
+                ws.Cell(row, statusCol).Style.Font.Bold = true;
+                ws.Cell(row, statusCol).Style.Font.FontColor = p.Status switch
+                {
+                    "ON"          => XLColor.FromHtml("#16a34a"),
+                    "OFF"         => XLColor.FromHtml("#dc2626"),
+                    "MAINTENANCE" => XLColor.FromHtml("#d97706"),
+                    _             => XLColor.Black
+                };
+            }
+
+            ws.Columns().AdjustToContents();
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            var fileName = $"{RunningSummaryFileBase(year, month)}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            return new FileContentResult(ms.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            { FileDownloadName = fileName };
+        }
+
+        // ── Running Summary PDF ──────────────────────────────────────────────
+        public FileContentResult ExportRunningSummaryAsPdf(
+            List<PumpRunningSummaryDto> rows, int year, int month, bool isCurrentMonth)
+        {
+            Logger.Info("ExportRunningSummaryAsPdf: {0} rows, period={1:D4}-{2:D2}, isCurrentMonth={3}",
+                rows.Count, year, month, isCurrentMonth);
+
+            var monthLabel = new DateTime(year, month, 1).ToString("MMMM yyyy");
+
+            var doc = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4.Landscape());
+                    page.Margin(1, Unit.Centimetre);
+                    page.DefaultTextStyle(x => x.FontSize(8));
+
+                    page.Header().Row(row =>
+                    {
+                        row.RelativeItem().Column(col =>
+                        {
+                            col.Item().Text("Bharatpur Development Authority")
+                               .Bold().FontSize(14).FontColor(Colors.Blue.Darken2);
+                            col.Item().Text($"Pump Running Summary  —  {monthLabel}")
+                               .FontSize(10).FontColor(Colors.Grey.Darken1);
+                            col.Item().Text($"Generated {DateTime.Now:dd MMM yyyy, HH:mm}")
+                               .FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+                        row.ConstantItem(100).AlignRight()
+                           .Text($"Total: {rows.Count} pumps").FontSize(9);
+                    });
+
+                    page.Content().PaddingTop(8).Table(table =>
+                    {
+                        table.ColumnsDefinition(cols =>
+                        {
+                            cols.ConstantColumn(35);   // Pump ID
+                            cols.RelativeColumn(2.5f); // Vendor
+                            cols.RelativeColumn(2.5f); // Location
+                            cols.RelativeColumn(2);    // Operator
+                            cols.ConstantColumn(55);   // Status
+                            if (isCurrentMonth)
+                            {
+                                cols.ConstantColumn(55); // Today Run
+                                cols.ConstantColumn(55); // Today Off
+                                cols.ConstantColumn(55); // Today Maint
+                            }
+                            cols.ConstantColumn(60); // Month Run
+                            cols.ConstantColumn(60); // Month Off
+                            cols.ConstantColumn(60); // Month Maint
+                        });
+
+                        static IContainer HeaderCell(IContainer c) =>
+                            c.Background(Colors.Blue.Darken2).Padding(4).AlignCenter();
+
+                        var heads = new List<string> { "ID", "Vendor", "Location", "Operator", "Status" };
+                        if (isCurrentMonth)
+                            heads.AddRange(new[] { "Today\nRun", "Today\nOff", "Today\nMaint." });
+                        heads.AddRange(new[]
+                        {
+                            $"{monthLabel}\nRun",
+                            $"{monthLabel}\nOff",
+                            $"{monthLabel}\nMaint."
+                        });
+
+                        table.Header(header =>
+                        {
+                            foreach (var h in heads)
+                                header.Cell().Element(HeaderCell)
+                                      .Text(h).FontColor(Colors.White).Bold().FontSize(7);
+                        });
+
+                        for (int i = 0; i < rows.Count; i++)
+                        {
+                            var p = rows[i];
+                            string bg = i % 2 == 0 ? Colors.White : "#F0F6FF";
+
+                            IContainer DataCell(IContainer c) =>
+                                c.Background(bg).BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4);
+
+                            table.Cell().Element(DataCell).Text(p.PumpId);
+                            table.Cell().Element(DataCell).Text(p.VendorName   ?? "");
+                            table.Cell().Element(DataCell).Text(p.Location     ?? "");
+                            table.Cell().Element(DataCell).Text(p.OperatorName ?? "");
+
+                            var statusColor = p.Status switch
+                            {
+                                "ON"          => Colors.Green.Darken2,
+                                "OFF"         => Colors.Red.Darken2,
+                                "MAINTENANCE" => Colors.Orange.Darken2,
+                                _             => Colors.Grey.Darken1
+                            };
+                            table.Cell().Element(DataCell).Text(p.Status ?? "").Bold().FontColor(statusColor);
+
+                            if (isCurrentMonth)
+                            {
+                                table.Cell().Element(DataCell).AlignRight().Text(FormatMinutes(p.TodayRunMinutes));
+                                table.Cell().Element(DataCell).AlignRight().Text(FormatMinutes(p.TodayOffMinutes));
+                                table.Cell().Element(DataCell).AlignRight().Text(FormatMinutes(p.TodayMaintenanceMinutes));
+                            }
+                            table.Cell().Element(DataCell).AlignRight().Text(FormatMinutes(p.MonthRunMinutes));
+                            table.Cell().Element(DataCell).AlignRight().Text(FormatMinutes(p.MonthOffMinutes));
+                            table.Cell().Element(DataCell).AlignRight().Text(FormatMinutes(p.MonthMaintenanceMinutes));
+                        }
+                    });
+
+                    page.Footer().AlignCenter().Text(t =>
+                    {
+                        t.Span("Page ").FontSize(8);
+                        t.CurrentPageNumber().FontSize(8);
+                        t.Span(" of ").FontSize(8);
+                        t.TotalPages().FontSize(8);
+                    });
+                });
+            });
+
+            var bytes = doc.GeneratePdf();
+            var fileName = $"{RunningSummaryFileBase(year, month)}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            return new FileContentResult(bytes, "application/pdf") { FileDownloadName = fileName };
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         //  COMPLAINT EXPORTS
         // ══════════════════════════════════════════════════════════════════════
 

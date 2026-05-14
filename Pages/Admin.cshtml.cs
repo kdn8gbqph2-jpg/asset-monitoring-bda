@@ -32,7 +32,7 @@ namespace asset_monitoring.Pages
         public List<BdaUserMaster> Users { get; set; } = new();
         public List<DashboardPumpDto> Pumps { get; set; } = new();
         public List<BdaPumpLocation> Locations { get; set; } = new();
-        public List<PumpRunningSummaryDto> RunningSummary { get; set; } = new();
+        public PumpRunningSummaryResult RunningSummary { get; set; } = new();
         public List<ComplaintLog> Complaints { get; set; } = new();
         public int OpenComplaintCount { get; set; }
         public Dictionary<string, string> AppSettings { get; set; } = new();
@@ -43,7 +43,7 @@ namespace asset_monitoring.Pages
         //  PAGE LOAD
         // ═════════════════════════════════════════════════════════════════════
 
-        public async Task<IActionResult> OnGetAsync()
+        public async Task<IActionResult> OnGetAsync(int? summaryYear = null, int? summaryMonth = null)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
             {
@@ -61,7 +61,8 @@ namespace asset_monitoring.Pages
                 .ToListAsync();
 
             Pumps = await _pumpDashboardService.GetPumpsAsync();
-            RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync();
+            RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync(
+                year: summaryYear, month: summaryMonth);
 
             Locations = await _context.BdaPumpLocations
                 .AsNoTracking()
@@ -337,6 +338,37 @@ namespace asset_monitoring.Pages
             {
                 Logger.Error(ex, "ExportPumps({0}) failed", format);
                 return StatusCode(500, $"Failed to generate {format} report");
+            }
+        }
+
+        // ── Running Summary downloads (CSV / XLSX / PDF) ─────────────────────
+        public Task<IActionResult> OnGetDownloadRunningSummaryCsvAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("CSV", summaryYear, summaryMonth);
+        public Task<IActionResult> OnGetDownloadRunningSummaryXlsxAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("XLSX", summaryYear, summaryMonth);
+        public Task<IActionResult> OnGetDownloadRunningSummaryPdfAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("PDF", summaryYear, summaryMonth);
+
+        private async Task<IActionResult> ExportRunningSummary(string format, int? year, int? month)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN") return RedirectToPage("/Index");
+            try
+            {
+                var summary = await _pumpDashboardService.GetPumpRunningSummaryAsync(
+                    year: year, month: month);
+                Logger.Info("ExportRunningSummary({0}): {1} rows, period={2}-{3}, admin={4}",
+                    format, summary.Rows.Count, summary.Year, summary.Month, Username);
+                return format switch
+                {
+                    "XLSX" => _reportExportService.ExportRunningSummaryAsXlsx(summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                    "PDF"  => _reportExportService.ExportRunningSummaryAsPdf (summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                    _      => _reportExportService.ExportRunningSummaryAsCsv (summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "ExportRunningSummary({0}) failed", format);
+                return StatusCode(500, $"Failed to generate running summary {format}");
             }
         }
 

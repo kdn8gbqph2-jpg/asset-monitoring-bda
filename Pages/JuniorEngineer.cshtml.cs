@@ -16,7 +16,7 @@ namespace asset_monitoring.Pages
         private readonly ApplicationDbContext _context;
 
         public List<DashboardPumpDto> Pumps { get; private set; } = new();
-        public List<PumpRunningSummaryDto> RunningSummary { get; private set; } = new();
+        public PumpRunningSummaryResult RunningSummary { get; private set; } = new();
         public List<ComplaintLog> Complaints { get; private set; } = new();
         public int OpenComplaintCount { get; private set; }
         public string? LoggedInUserName { get; private set; }
@@ -31,7 +31,7 @@ namespace asset_monitoring.Pages
             _context             = context;
         }
 
-        public async Task<IActionResult> OnGetAsync()
+        public async Task<IActionResult> OnGetAsync(int? summaryYear = null, int? summaryMonth = null)
         {
             if (!IsLoggedIn)
             {
@@ -50,7 +50,8 @@ namespace asset_monitoring.Pages
 
             // ADMIN sees all pumps; JE sees pumps assigned to them via je_mobile
             Pumps = await _pumpService.GetPumpsAsync(UserId, UserType);
-            RunningSummary = await _pumpService.GetPumpRunningSummaryAsync(UserId, UserType);
+            RunningSummary = await _pumpService.GetPumpRunningSummaryAsync(
+                UserId, UserType, summaryYear, summaryMonth);
 
             // Complaints: JE sees only those assigned to them (by je_mobile); ADMIN sees all
             var complaintQuery = _context.ComplaintLogs.AsNoTracking();
@@ -200,6 +201,38 @@ namespace asset_monitoring.Pages
             {
                 Logger.Error(ex, "JE OnGetDownloadReportPdfAsync failed");
                 return StatusCode(500, "Failed to generate report");
+            }
+        }
+
+        // ── Running Summary downloads (CSV / XLSX / PDF) ─────────────────────
+        public Task<IActionResult> OnGetDownloadRunningSummaryCsvAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("CSV", summaryYear, summaryMonth);
+        public Task<IActionResult> OnGetDownloadRunningSummaryXlsxAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("XLSX", summaryYear, summaryMonth);
+        public Task<IActionResult> OnGetDownloadRunningSummaryPdfAsync(int? summaryYear, int? summaryMonth)
+            => ExportRunningSummary("PDF", summaryYear, summaryMonth);
+
+        private async Task<IActionResult> ExportRunningSummary(string format, int? year, int? month)
+        {
+            if (!IsLoggedIn || (UserType != "JE" && UserType != "ADMIN"))
+                return RedirectToPage("/Index");
+            try
+            {
+                var summary = await _pumpService.GetPumpRunningSummaryAsync(
+                    UserId, UserType, year, month);
+                Logger.Info("JE ExportRunningSummary({0}): {1} rows, period={2}-{3}, userId={4}",
+                    format, summary.Rows.Count, summary.Year, summary.Month, UserId);
+                return format switch
+                {
+                    "XLSX" => _reportExportService.ExportRunningSummaryAsXlsx(summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                    "PDF"  => _reportExportService.ExportRunningSummaryAsPdf (summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                    _      => _reportExportService.ExportRunningSummaryAsCsv (summary.Rows, summary.Year, summary.Month, summary.IsCurrentMonth),
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JE ExportRunningSummary({0}) failed", format);
+                return StatusCode(500, $"Failed to generate running summary {format}");
             }
         }
     }
