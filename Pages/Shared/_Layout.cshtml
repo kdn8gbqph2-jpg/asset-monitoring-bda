@@ -70,6 +70,13 @@
             <span class="mx-2">·</span>
             <span class="small">v@(asset_monitoring.Pages.AboutModel.AppVersion)</span>
         </p>
+        @if (ViewData["ShowITCellCredit"] as bool? == true)
+        {
+            <p class="mb-0 mt-2 text-muted small">
+                Designed, Hosted &amp; Maintained by
+                <span class="fw-semibold">IT Cell, Bharatpur Development Authority</span>
+            </p>
+        }
     </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
