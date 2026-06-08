@@ -490,6 +490,79 @@ namespace asset_monitoring.Pages
             }
         }
 
+        public async Task<IActionResult> OnPostDeleteComplaintPhotoAsync([FromBody] DeleteComplaintPhotoInput input)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return UnauthorizedJson();
+
+            if (input == null || input.ComplaintId <= 0)
+                return new JsonResult(new { success = false, message = "Invalid input" });
+
+            Logger.Info("DeleteComplaintPhoto: #{0} by {1}", input.ComplaintId, Username);
+            try
+            {
+                var complaint = await _context.ComplaintLogs.FindAsync(input.ComplaintId);
+                if (complaint == null)
+                    return new JsonResult(new { success = false, message = "Complaint not found" });
+
+                if (string.IsNullOrEmpty(complaint.PhotoPath))
+                    return new JsonResult(new { success = false, message = "No photo attached" });
+
+                DeletePhysicalPhoto(complaint.PhotoPath);
+
+                complaint.PhotoPath = null;
+                complaint.RowUpdationDateTime = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                Logger.Info("DeleteComplaintPhoto: photo removed for #{0}", input.ComplaintId);
+                return new JsonResult(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "DeleteComplaintPhoto failed for #{0}", input.ComplaintId);
+                return new JsonResult(new { success = false, message = "Failed to delete photo" });
+            }
+        }
+
+        /// <summary>
+        /// Deletes the on-disk file for a stored complaint photo. The path is
+        /// from our own DB, but we still confine deletion to the uploads folder
+        /// so a malformed value can never reach outside wwwroot/uploads.
+        /// A missing file is treated as success (the DB row is what matters).
+        /// </summary>
+        private void DeletePhysicalPhoto(string relativePath)
+        {
+            try
+            {
+                var env = HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
+                var uploadsRoot = Path.GetFullPath(Path.Combine(env.WebRootPath, "uploads", "complaints"));
+                var normalized = relativePath.Replace('/', Path.DirectorySeparatorChar);
+                var fullPath = Path.GetFullPath(Path.Combine(env.WebRootPath, normalized));
+
+                if (!fullPath.StartsWith(uploadsRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    Logger.Warn("DeletePhysicalPhoto: path '{0}' resolved outside uploads root — skipping file delete", relativePath);
+                    return;
+                }
+
+                if (System.IO.File.Exists(fullPath))
+                {
+                    System.IO.File.Delete(fullPath);
+                    Logger.Info("DeletePhysicalPhoto: deleted {0}", relativePath);
+                }
+                else
+                {
+                    Logger.Warn("DeletePhysicalPhoto: file not found on disk: {0}", relativePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Don't fail the whole operation if the file can't be removed —
+                // the DB reference is cleared regardless.
+                Logger.Warn(ex, "DeletePhysicalPhoto: failed to delete file {0}", relativePath);
+            }
+        }
+
         public IActionResult OnPostLogout()
         {
             Logger.Info("Admin {0} logged out", Username);
@@ -588,6 +661,11 @@ namespace asset_monitoring.Pages
         public int ComplaintId { get; set; }
         public string? Status { get; set; }
         public string? Remarks { get; set; }
+    }
+
+    public class DeleteComplaintPhotoInput
+    {
+        public int ComplaintId { get; set; }
     }
 
     public class SaveSettingsInput

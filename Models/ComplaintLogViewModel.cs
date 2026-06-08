@@ -18,5 +18,12 @@ namespace asset_monitoring.Models
         /// Admin + JE = true; future read-only views = false.
         /// </summary>
         public bool ShowActions { get; set; } = true;
+
+        /// <summary>
+        /// When true, render a "Delete photo" control on rows that have an
+        /// attached photo. Admin only — the matching DeleteComplaintPhoto
+        /// handler exists on the Admin page and enforces ADMIN authorization.
+        /// </summary>
+        public bool ShowPhotoDelete { get; set; }
     }
 }
