@@ -348,7 +348,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn text-white" style="background:#25D366;"
+                    <button type="button" id="cmpSendBtn" class="btn text-white" style="background:#25D366;"
                             onclick="submitComplaint()">
                         <i class="bi bi-whatsapp me-1"></i> Submit &amp; Send WhatsApp
                     </button>
@@ -824,6 +824,10 @@
             document.getElementById('cmpInfo').classList.add('d-none');
             clearComplaintPhoto();
 
+            // New complaint session — reset the "already saved" guard so the
+            // next submit persists exactly one row (retries reuse that save).
+            complaintSaved = false;
+
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('complaintModal'));
             modal.show();
         }
@@ -865,6 +869,38 @@
             }
         }
 
+        // WhatsApp message template (resolved from AppConfigs server-side).
+        // Built into the page so the client can assemble the text WITHOUT a
+        // server round-trip — essential for the iOS Web Share path below.
+        const COMPLAINT_TEMPLATE = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ComplaintMessageTemplate));
+
+        // Per-modal-session guards: persist the complaint exactly once, and
+        // ignore double-taps while a submit is in flight.
+        let complaintSaved   = false;
+        let complaintInFlight = false;
+
+        function buildComplaintMessage(actualStatus, complainantName, complainantMobile) {
+            const v = id => (document.getElementById(id)?.value || '');
+            const map = {
+                '{pump_id}':            v('cmpPumpId'),
+                '{vendor}':             v('cmpVendor'),
+                '{location}':           v('cmpLocationDisplay'),
+                '{status}':             v('cmpDashStatus'),
+                '{actual_status}':      actualStatus || '',
+                '{operator_name}':      v('cmpOperatorName'),
+                '{operator_mobile}':    v('cmpOperatorMobile'),
+                '{je_name}':            v('cmpJeName'),
+                '{je_mobile}':          v('cmpJeMobile'),
+                '{complainant_name}':   complainantName || '',
+                '{complainant_mobile}': complainantMobile || ''
+            };
+            let msg = COMPLAINT_TEMPLATE.replace(/\\n/g, '\n'); // DB templates store literal \n
+            for (const [k, val] of Object.entries(map)) {
+                msg = msg.split(k).join(val);
+            }
+            return msg;
+        }
+
         async function submitComplaint() {
             let actualStatus = document.getElementById('cmpActualStatus').value;
             if (actualStatus === 'OTHER') {
@@ -894,97 +930,121 @@
             errEl.classList.add('d-none');
             infoEl.classList.add('d-none');
 
-            // Capture the chosen photo synchronously — if we can share it
-            // through the OS share sheet later, we'll use this File directly.
+            if (complaintInFlight) return;          // ignore double-taps
+            complaintInFlight = true;
+            const sendBtn = document.getElementById('cmpSendBtn');
+            if (sendBtn) sendBtn.disabled = true;
+
+            // Everything from here until navigator.share() is INVOKED must stay
+            // synchronous — iOS Safari revokes the user-activation that Web Share
+            // requires the moment we await (or call window.open). So we capture
+            // the file, build the message text locally, and only THEN share.
             const photoInput = document.getElementById('cmpPhoto');
             const photoFile  = photoInput && photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
+            const token      = document.querySelector('#complaintForm input[name="__RequestVerificationToken"]').value;
 
-            // ── iOS Safari popup-blocker workaround ─────────────────────────
-            // window.open() only honours the user-gesture token if it runs
-            // SYNCHRONOUSLY inside the click handler. We open the tab now in
-            // case we fall back to wa.me after the await. If Web Share takes
-            // over, we close it.
-            const waWindow = window.open('about:blank', '_blank');
+            const canShareFile = !!(photoFile && navigator.canShare &&
+                                    navigator.canShare({ files: [photoFile] }));
+            const waText = buildComplaintMessage(actualStatus, name, mobile);
 
-            const token = document.querySelector('#complaintForm input[name="__RequestVerificationToken"]').value;
-
-            const fd = new FormData();
-            fd.append('PumpId',            document.getElementById('cmpPumpId').value);
-            fd.append('Location',          document.getElementById('cmpLocationDisplay').value);
-            fd.append('DashboardStatus',   document.getElementById('cmpDashStatus').value);
-            fd.append('ActualStatus',      actualStatus);
-            fd.append('VendorName',        document.getElementById('cmpVendor').value);
-            fd.append('OperatorName',      document.getElementById('cmpOperatorName').value);
-            fd.append('OperatorMobile',    document.getElementById('cmpOperatorMobile').value);
-            fd.append('JeName',            document.getElementById('cmpJeName').value);
-            fd.append('JeMobile',          document.getElementById('cmpJeMobile').value);
-            fd.append('ComplainantName',   name);
-            fd.append('ComplainantMobile', mobile);
-            if (photoFile) fd.append('Photo', photoFile);
-
-            try {
-                const res  = await fetch('?handler=SubmitComplaint', {
+            // Persist the complaint at most once per modal session. Resolves to
+            // the server JSON (which carries whatsappUrl for the fallback path).
+            const ensureSaved = () => {
+                if (complaintSaved) return Promise.resolve({ success: true });
+                const fd = new FormData();
+                fd.append('PumpId',            document.getElementById('cmpPumpId').value);
+                fd.append('Location',          document.getElementById('cmpLocationDisplay').value);
+                fd.append('DashboardStatus',   document.getElementById('cmpDashStatus').value);
+                fd.append('ActualStatus',      actualStatus);
+                fd.append('VendorName',        document.getElementById('cmpVendor').value);
+                fd.append('OperatorName',      document.getElementById('cmpOperatorName').value);
+                fd.append('OperatorMobile',    document.getElementById('cmpOperatorMobile').value);
+                fd.append('JeName',            document.getElementById('cmpJeName').value);
+                fd.append('JeMobile',          document.getElementById('cmpJeMobile').value);
+                fd.append('ComplainantName',   name);
+                fd.append('ComplainantMobile', mobile);
+                if (photoFile) fd.append('Photo', photoFile);
+                return fetch('?handler=SubmitComplaint', {
                     method: 'POST',
                     headers: { 'RequestVerificationToken': token },
                     body: fd
-                });
-                const data = await res.json();
+                })
+                .then(r => r.json())
+                .then(d => { if (d && d.success) complaintSaved = true; return d; });
+            };
+
+            const closeModal = () =>
+                bootstrap.Modal.getInstance(document.getElementById('complaintModal'))?.hide();
+
+            try {
+                // ── PATH A: photo present AND Web Share works (mobile) ──────
+                if (canShareFile) {
+                    // Start the save WITHOUT awaiting (fetch doesn't consume the
+                    // activation; awaiting it would) — then share immediately.
+                    const savePromise = ensureSaved();
+                    try {
+                        await navigator.share({ text: waText, files: [photoFile] });
+                    } catch (shareErr) {
+                        const saved = await savePromise.catch(() => ({ success: false }));
+                        if (shareErr && shareErr.name === 'AbortError') {
+                            // User dismissed the sheet — record is saved; let them retry.
+                            infoEl.textContent = saved.success
+                                ? 'Complaint saved. Tap “Submit & Send WhatsApp” again to share the photo.'
+                                : 'Could not confirm the complaint was saved. Please try again.';
+                            infoEl.classList.remove('d-none');
+                            return;
+                        }
+                        // Real share failure → fall back to wa.me (text only).
+                        if (saved.success && saved.whatsappUrl) {
+                            closeModal();
+                            window.location.href = saved.whatsappUrl;
+                            setTimeout(() => alert(
+                                'Tap the paperclip in WhatsApp and attach the photo — ' +
+                                'this browser couldn\'t send it together with the message.'), 300);
+                        } else {
+                            errEl.textContent = (saved && saved.message) || 'Failed to submit complaint.';
+                            errEl.classList.remove('d-none');
+                        }
+                        return;
+                    }
+                    // Shared OK — make sure the audit record landed.
+                    const saved = await savePromise.catch(() => ({ success: false }));
+                    if (!saved.success) {
+                        infoEl.textContent = 'Photo shared, but saving the complaint record failed. Please inform the office.';
+                        infoEl.classList.remove('d-none');
+                    }
+                    closeModal();
+                    return;
+                }
+
+                // ── PATH B: no photo, or Web Share unsupported (desktop) ────
+                // Open the tab synchronously (also needs activation), save, redirect.
+                const waWindow = window.open('about:blank', '_blank');
+                const data = await ensureSaved();
                 if (!data.success) {
                     if (waWindow) waWindow.close();
                     errEl.textContent = data.message || 'Failed to submit complaint.';
                     errEl.classList.remove('d-none');
                     return;
                 }
-
-                // Build the human-readable message from the URL we got back so
-                // we can hand it to navigator.share() if available.
-                let waText = '';
-                try {
-                    const u = new URL(data.whatsappUrl, window.location.origin);
-                    waText = u.searchParams.get('text') || '';
-                } catch (_) { /* ignore — waText stays empty */ }
-
-                const canShareFile = photoFile && navigator.canShare && navigator.canShare({ files: [photoFile] });
-
-                if (canShareFile) {
-                    // Native share sheet — message + photo go to whichever app
-                    // the user picks (WhatsApp on most phones).
-                    try {
-                        await navigator.share({ text: waText, files: [photoFile] });
-                        if (waWindow) waWindow.close();
-                        bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
-                        return;
-                    } catch (shareErr) {
-                        // User dismissed the share sheet, or the API rejected
-                        // — fall through to the wa.me path so they still have
-                        // a way to send.
-                        console.warn('navigator.share failed, falling back to wa.me', shareErr);
-                    }
-                }
-
-                // Fallback: wa.me opens with the message pre-filled. If there
-                // was a photo, show a banner reminding the user to attach it
-                // manually with WhatsApp's paperclip icon.
-                bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
+                closeModal();
                 if (waWindow && !waWindow.closed) {
                     waWindow.location.href = data.whatsappUrl;
                 } else {
                     window.location.href = data.whatsappUrl;
                 }
                 if (photoFile) {
-                    // The modal is hidden now, but for the next time the user
-                    // opens it we'll have cleared the input via clearComplaintPhoto.
-                    // Use an alert as the only reliable cross-tab signal.
                     setTimeout(() => alert(
                         'Tap the paperclip in WhatsApp and attach the photo — ' +
-                        'this browser couldn\'t send it together with the message.'
-                    ), 300);
+                        'this browser couldn\'t send it together with the message.'), 300);
                 }
             } catch (err) {
-                if (waWindow) waWindow.close();
                 console.error('submitComplaint failed', err);
                 errEl.textContent = 'Error submitting complaint. Please try again.';
                 errEl.classList.remove('d-none');
+            } finally {
+                complaintInFlight = false;
+                if (sendBtn) sendBtn.disabled = false;
             }
         }
 

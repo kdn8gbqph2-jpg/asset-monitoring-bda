@@ -29,6 +29,11 @@ namespace asset_monitoring.Pages
         public string? LoginMessage { get; private set; }
         public string CaptchaQuestion { get; private set; } = "";
 
+        // Exposed to the page so the client can build the WhatsApp message text
+        // up-front — required for the iOS Web Share path, which must run inside
+        // the tap gesture (before any server round-trip consumes the activation).
+        public string ComplaintMessageTemplate { get; private set; } = "";
+
         // ── Map config ──────────────────────────────────────────────────────
         public decimal MapCenterLatitude { get; private set; }
         public decimal MapCenterLongitude { get; private set; }
@@ -62,7 +67,25 @@ namespace asset_monitoring.Pages
         public async Task OnGetAsync()
         {
             await LoadDashboardDataAsync();
+            await LoadComplaintTemplateAsync();
             GenerateLoginCaptcha();
+        }
+
+        private async Task LoadComplaintTemplateAsync()
+        {
+            try
+            {
+                var tpl = await _db.AppConfigs.AsNoTracking()
+                    .Where(c => c.ConfigKey == "complaint_message_template")
+                    .Select(c => c.ConfigValue)
+                    .FirstOrDefaultAsync();
+                ComplaintMessageTemplate = string.IsNullOrWhiteSpace(tpl) ? DefaultComplaintTemplate : tpl;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "LoadComplaintTemplateAsync failed; using default template");
+                ComplaintMessageTemplate = DefaultComplaintTemplate;
+            }
         }
 
         private async Task LoadDashboardDataAsync()
@@ -295,6 +318,12 @@ namespace asset_monitoring.Pages
             }
         }
 
+        private const string DefaultComplaintTemplate =
+            "*PUMP COMPLAINT*\n\nPump ID: {pump_id}\nVendor: {vendor}\nLocation: {location}\n"
+          + "Dashboard Status: {status}\nActual Status: {actual_status}\n\n"
+          + "Operator: {operator_name} ({operator_mobile})\nJE: {je_name} ({je_mobile})\n\n"
+          + "Complainant: {complainant_name}\nMobile: {complainant_mobile}";
+
         private async Task<string> BuildWhatsAppUrl(ComplaintInputModel input)
         {
             var configs = await _db.AppConfigs.AsNoTracking().ToListAsync();
@@ -305,12 +334,7 @@ namespace asset_monitoring.Pages
             var template    = cfg.GetValueOrDefault("complaint_message_template", "");
 
             if (string.IsNullOrWhiteSpace(template))
-            {
-                template = "*PUMP COMPLAINT*\n\nPump ID: {pump_id}\nVendor: {vendor}\nLocation: {location}\n"
-                         + "Dashboard Status: {status}\nActual Status: {actual_status}\n\n"
-                         + "Operator: {operator_name} ({operator_mobile})\nJE: {je_name} ({je_mobile})\n\n"
-                         + "Complainant: {complainant_name}\nMobile: {complainant_mobile}";
-            }
+                template = DefaultComplaintTemplate;
 
             // Replace placeholders
             var message = template
