@@ -46,6 +46,14 @@ namespace asset_monitoring.Models
         [MaxLength(500)]
         public string? Remarks { get; set; }
 
+        /// <summary>
+        /// Relative path (under wwwroot) of an optional photo attached to the
+        /// complaint at submission time. Null when the complainant didn't
+        /// attach a photo. Example: "uploads/complaints/2026-05/abcd.jpg".
+        /// </summary>
+        [MaxLength(255)]
+        public string? PhotoPath { get; set; }
+
         public DateTime RowInsertionDateTime { get; set; }
 
         public DateTime RowUpdationDateTime { get; set; }

@@ -181,9 +181,10 @@ namespace asset_monitoring.Pages
         //  COMPLAINT SUBMISSION
         // ═════════════════════════════════════════════════════════════════════
 
-        public async Task<JsonResult> OnPostSubmitComplaintAsync([FromBody] ComplaintInputModel input)
+        public async Task<JsonResult> OnPostSubmitComplaintAsync([FromForm] ComplaintInputModel input)
         {
-            Logger.Info("OnPostSubmitComplaintAsync: pumpId={0}, mobile={1}", input.PumpId, input.ComplainantMobile);
+            Logger.Info("OnPostSubmitComplaintAsync: pumpId={0}, mobile={1}, hasPhoto={2}",
+                input.PumpId, input.ComplainantMobile, input.Photo != null);
             try
             {
                 if (string.IsNullOrWhiteSpace(input.ComplainantName) ||
@@ -193,7 +194,16 @@ namespace asset_monitoring.Pages
                     return new JsonResult(new { success = false, message = "Complainant Name, Mobile and Actual Status are required." });
                 }
 
-                // Save complaint to DB
+                // Persist the photo (if any) BEFORE inserting the row so the
+                // path is set in a single DB write. If the upload fails we log
+                // and continue — the complaint itself is more important than
+                // its attachment.
+                string? photoPath = null;
+                if (input.Photo != null)
+                {
+                    photoPath = await SaveComplaintPhotoAsync(input.Photo);
+                }
+
                 var now = DateTime.UtcNow;
                 var complaint = new ComplaintLog
                 {
@@ -208,21 +218,80 @@ namespace asset_monitoring.Pages
                     ComplainantName      = input.ComplainantName,
                     ComplainantMobile    = input.ComplainantMobile,
                     Status               = "OPEN",
+                    PhotoPath            = photoPath,
                     RowInsertionDateTime = now,
                     RowUpdationDateTime  = now
                 };
                 _db.ComplaintLogs.Add(complaint);
                 await _db.SaveChangesAsync();
-                Logger.Info("Complaint #{0} saved for pumpId={1}", complaint.ComplaintId, input.PumpId);
+                Logger.Info("Complaint #{0} saved for pumpId={1}, photo={2}",
+                    complaint.ComplaintId, input.PumpId, photoPath ?? "(none)");
 
                 // Build WhatsApp URL from app config
                 var whatsappUrl = await BuildWhatsAppUrl(input);
-                return new JsonResult(new { success = true, whatsappUrl });
+                var photoUrl = photoPath != null ? $"/{photoPath}" : null;
+                return new JsonResult(new { success = true, whatsappUrl, photoUrl });
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "OnPostSubmitComplaintAsync failed for pumpId={0}", input.PumpId);
                 return new JsonResult(new { success = false, message = "Failed to submit complaint." });
+            }
+        }
+
+        // SVG is intentionally excluded — it can carry script payloads and we
+        // serve uploads from wwwroot, so allowing SVG would open an XSS hole.
+        private static readonly HashSet<string> AllowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg", "image/jpg", "image/png", "image/webp",
+            "image/heic", "image/heif", "image/gif"
+        };
+
+        private const int MaxComplaintPhotoBytes = 10 * 1024 * 1024; // 10 MB
+
+        private async Task<string?> SaveComplaintPhotoAsync(IFormFile photo)
+        {
+            if (photo.Length <= 0 || photo.Length > MaxComplaintPhotoBytes)
+            {
+                Logger.Warn("Complaint photo rejected: size={0}", photo.Length);
+                return null;
+            }
+            if (!AllowedImageTypes.Contains(photo.ContentType ?? string.Empty))
+            {
+                Logger.Warn("Complaint photo rejected: contentType={0}", photo.ContentType);
+                return null;
+            }
+
+            var ext = photo.ContentType?.ToLowerInvariant() switch
+            {
+                "image/jpeg" or "image/jpg" => ".jpg",
+                "image/png"                 => ".png",
+                "image/webp"                => ".webp",
+                "image/heic"                => ".heic",
+                "image/heif"                => ".heif",
+                "image/gif"                 => ".gif",
+                _                            => ".bin"
+            };
+
+            var env = HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
+            var monthFolder = DateTime.UtcNow.ToString("yyyy-MM");
+            var fileName = $"{Guid.NewGuid():N}{ext}";
+            var relativePath = $"uploads/complaints/{monthFolder}/{fileName}";
+            var absDir = Path.Combine(env.WebRootPath, "uploads", "complaints", monthFolder);
+            Directory.CreateDirectory(absDir);
+            var absPath = Path.Combine(absDir, fileName);
+
+            try
+            {
+                await using var stream = System.IO.File.Create(absPath);
+                await photo.CopyToAsync(stream);
+                Logger.Info("Complaint photo saved: {0} ({1} bytes)", relativePath, photo.Length);
+                return relativePath;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Failed to save complaint photo");
+                return null;
             }
         }
 
@@ -469,6 +538,7 @@ namespace asset_monitoring.Pages
             public string? JeMobile { get; set; }
             public string? ComplainantName { get; set; }
             public string? ComplainantMobile { get; set; }
+            public IFormFile? Photo { get; set; }
         }
 
         public class LoginInputModel

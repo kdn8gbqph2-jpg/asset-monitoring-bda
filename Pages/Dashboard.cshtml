@@ -326,6 +326,24 @@
                                pattern="[0-9]{10}" maxlength="10" />
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Attach Photo <span class="text-muted small">(optional, max 10 MB)</span>
+                        </label>
+                        <input type="file" class="form-control" id="cmpPhoto"
+                               accept="image/*" capture="environment"
+                               onchange="previewComplaintPhoto(event)" />
+                        <div id="cmpPhotoPreviewWrap" class="mt-2 d-none">
+                            <img id="cmpPhotoPreview" alt="Selected photo"
+                                 style="max-width:100%; max-height:160px; border:1px solid #dee2e6; border-radius:4px;" />
+                            <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-2"
+                                    onclick="clearComplaintPhoto()">
+                                <i class="bi bi-x-circle"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="cmpInfo" class="alert alert-info d-none small mb-0"></div>
                     <div id="cmpError" class="alert alert-danger d-none"></div>
                 </div>
                 <div class="modal-footer">
@@ -803,9 +821,36 @@
             document.getElementById('cmpName').value         = '';
             document.getElementById('cmpMobile').value       = '';
             document.getElementById('cmpError').classList.add('d-none');
+            document.getElementById('cmpInfo').classList.add('d-none');
+            clearComplaintPhoto();
 
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('complaintModal'));
             modal.show();
+        }
+
+        function previewComplaintPhoto(ev) {
+            const file = ev.target.files && ev.target.files[0];
+            const wrap = document.getElementById('cmpPhotoPreviewWrap');
+            const img  = document.getElementById('cmpPhotoPreview');
+            if (!file) { wrap.classList.add('d-none'); img.src = ''; return; }
+            // 10 MB hard cap (mirrors server limit; warn the user early).
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Photo is larger than 10 MB. Please pick a smaller image.');
+                clearComplaintPhoto();
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = e => { img.src = e.target.result; wrap.classList.remove('d-none'); };
+            reader.readAsDataURL(file);
+        }
+
+        function clearComplaintPhoto() {
+            const input = document.getElementById('cmpPhoto');
+            if (input) input.value = '';
+            const wrap = document.getElementById('cmpPhotoPreviewWrap');
+            const img  = document.getElementById('cmpPhotoPreview');
+            if (wrap) wrap.classList.add('d-none');
+            if (img)  img.src = '';
         }
 
         function toggleOtherStatus() {
@@ -831,10 +876,11 @@
                     return;
                 }
             }
-            const mobile       = document.getElementById('cmpMobile').value.trim();
-            const errEl        = document.getElementById('cmpError');
+            const mobile = document.getElementById('cmpMobile').value.trim();
+            const name   = document.getElementById('cmpName').value.trim();
+            const errEl  = document.getElementById('cmpError');
+            const infoEl = document.getElementById('cmpInfo');
 
-            const name = document.getElementById('cmpName').value.trim();
             if (!actualStatus || !mobile || !name) {
                 errEl.textContent = 'Complainant Name, Actual Status, and Mobile are required.';
                 errEl.classList.remove('d-none');
@@ -846,59 +892,93 @@
                 return;
             }
             errEl.classList.add('d-none');
+            infoEl.classList.add('d-none');
+
+            // Capture the chosen photo synchronously — if we can share it
+            // through the OS share sheet later, we'll use this File directly.
+            const photoInput = document.getElementById('cmpPhoto');
+            const photoFile  = photoInput && photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
 
             // ── iOS Safari popup-blocker workaround ─────────────────────────
             // window.open() only honours the user-gesture token if it runs
-            // SYNCHRONOUSLY inside the click handler. After the await on the
-            // fetch below, the gesture is gone and Safari blocks the popup
-            // silently — that's why "Submit & Send WhatsApp" appeared dead on
-            // some iPhones. Open a blank tab now (still synchronous) and
-            // redirect it once the URL is back.
+            // SYNCHRONOUSLY inside the click handler. We open the tab now in
+            // case we fall back to wa.me after the await. If Web Share takes
+            // over, we close it.
             const waWindow = window.open('about:blank', '_blank');
 
             const token = document.querySelector('#complaintForm input[name="__RequestVerificationToken"]').value;
-            const payload = {
-                PumpId:           document.getElementById('cmpPumpId').value,
-                Location:         document.getElementById('cmpLocationDisplay').value,
-                DashboardStatus:  document.getElementById('cmpDashStatus').value,
-                ActualStatus:     actualStatus,
-                VendorName:       document.getElementById('cmpVendor').value,
-                OperatorName:     document.getElementById('cmpOperatorName').value,
-                OperatorMobile:   document.getElementById('cmpOperatorMobile').value,
-                JeName:           document.getElementById('cmpJeName').value,
-                JeMobile:         document.getElementById('cmpJeMobile').value,
-                ComplainantName:  document.getElementById('cmpName').value.trim(),
-                ComplainantMobile: mobile
-            };
+
+            const fd = new FormData();
+            fd.append('PumpId',            document.getElementById('cmpPumpId').value);
+            fd.append('Location',          document.getElementById('cmpLocationDisplay').value);
+            fd.append('DashboardStatus',   document.getElementById('cmpDashStatus').value);
+            fd.append('ActualStatus',      actualStatus);
+            fd.append('VendorName',        document.getElementById('cmpVendor').value);
+            fd.append('OperatorName',      document.getElementById('cmpOperatorName').value);
+            fd.append('OperatorMobile',    document.getElementById('cmpOperatorMobile').value);
+            fd.append('JeName',            document.getElementById('cmpJeName').value);
+            fd.append('JeMobile',          document.getElementById('cmpJeMobile').value);
+            fd.append('ComplainantName',   name);
+            fd.append('ComplainantMobile', mobile);
+            if (photoFile) fd.append('Photo', photoFile);
 
             try {
                 const res  = await fetch('?handler=SubmitComplaint', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'RequestVerificationToken': token
-                    },
-                    body: JSON.stringify(payload)
+                    headers: { 'RequestVerificationToken': token },
+                    body: fd
                 });
                 const data = await res.json();
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
-                    // Redirect the tab we opened earlier (works on iOS Safari)
-                    if (data.whatsappUrl) {
-                        if (waWindow && !waWindow.closed) {
-                            waWindow.location.href = data.whatsappUrl;
-                        } else {
-                            // Popup was blocked despite the workaround — fall
-                            // back to navigating the current tab.
-                            window.location.href = data.whatsappUrl;
-                        }
-                    } else if (waWindow) {
-                        waWindow.close();
-                    }
-                } else {
+                if (!data.success) {
                     if (waWindow) waWindow.close();
                     errEl.textContent = data.message || 'Failed to submit complaint.';
                     errEl.classList.remove('d-none');
+                    return;
+                }
+
+                // Build the human-readable message from the URL we got back so
+                // we can hand it to navigator.share() if available.
+                let waText = '';
+                try {
+                    const u = new URL(data.whatsappUrl, window.location.origin);
+                    waText = u.searchParams.get('text') || '';
+                } catch (_) { /* ignore — waText stays empty */ }
+
+                const canShareFile = photoFile && navigator.canShare && navigator.canShare({ files: [photoFile] });
+
+                if (canShareFile) {
+                    // Native share sheet — message + photo go to whichever app
+                    // the user picks (WhatsApp on most phones).
+                    try {
+                        await navigator.share({ text: waText, files: [photoFile] });
+                        if (waWindow) waWindow.close();
+                        bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
+                        return;
+                    } catch (shareErr) {
+                        // User dismissed the share sheet, or the API rejected
+                        // — fall through to the wa.me path so they still have
+                        // a way to send.
+                        console.warn('navigator.share failed, falling back to wa.me', shareErr);
+                    }
+                }
+
+                // Fallback: wa.me opens with the message pre-filled. If there
+                // was a photo, show a banner reminding the user to attach it
+                // manually with WhatsApp's paperclip icon.
+                bootstrap.Modal.getInstance(document.getElementById('complaintModal')).hide();
+                if (waWindow && !waWindow.closed) {
+                    waWindow.location.href = data.whatsappUrl;
+                } else {
+                    window.location.href = data.whatsappUrl;
+                }
+                if (photoFile) {
+                    // The modal is hidden now, but for the next time the user
+                    // opens it we'll have cleared the input via clearComplaintPhoto.
+                    // Use an alert as the only reliable cross-tab signal.
+                    setTimeout(() => alert(
+                        'Tap the paperclip in WhatsApp and attach the photo — ' +
+                        'this browser couldn\'t send it together with the message.'
+                    ), 300);
                 }
             } catch (err) {
                 if (waWindow) waWindow.close();

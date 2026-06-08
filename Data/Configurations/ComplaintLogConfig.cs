@@ -70,6 +70,10 @@ namespace asset_monitoring.Data.Configurations
                   .HasColumnName("remarks")
                   .HasMaxLength(500);
 
+            entity.Property(e => e.PhotoPath)
+                  .HasColumnName("photo_path")
+                  .HasMaxLength(255);
+
             entity.Property(e => e.RowInsertionDateTime)
                   .HasColumnName("row_insertion_date_time")
                   .HasDefaultValueSql("CURRENT_TIMESTAMP");
