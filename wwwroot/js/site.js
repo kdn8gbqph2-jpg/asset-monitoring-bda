@@ -318,3 +318,17 @@
             );
         });
     });
+
+    // ── Pump status-history row colour ─────────────────────────────────────────
+    // Shared by the Dashboard pump-detail modal and the Running Summary modal.
+    // Maps the period's "New" status to a CSS class defined in site.css:
+    //   ON → green (running), OFF → red (stopped), MAINTENANCE → amber.
+    function pumpLogRowClass(status) {
+        switch ((status || '').toUpperCase()) {
+            case 'ON':          return 'pump-log-on';
+            case 'OFF':         return 'pump-log-off';
+            case 'MAINTENANCE':
+            case 'MAINT':       return 'pump-log-maint';
+            default:            return '';
+        }
+    }
