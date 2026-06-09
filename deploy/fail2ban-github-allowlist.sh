@@ -28,8 +28,10 @@ OUT="/etc/fail2ban/jail.d/github-actions-ignoreip.local"
 
 # Admin IPs that must NEVER be banned. Loopback is always included; add your
 # office/static IP here so a fat-fingered SSH login can't lock you out.
-# (This becomes the sshd/nginx jails' ignoreip, so list anything you rely on.)
-ADMIN_IPS="127.0.0.1/8 ::1"
+# (This becomes the [DEFAULT] ignoreip for ALL jails, so list anything you rely
+#  on — if you drop an entry here, a weekly cron run will remove it server-side.)
+# Override at runtime with:  sudo ADMIN_IPS="127.0.0.1/8 1.2.3.4" ./fail2ban-github-allowlist.sh
+ADMIN_IPS="${ADMIN_IPS:-127.0.0.1/8 ::1 27.58.26.217}"
 
 # ── Preconditions ────────────────────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then echo "Run with sudo." >&2; exit 1; fi

@@ -59,17 +59,31 @@ Handoff reference for future Claude sessions. Keep this file updated whenever th
 - `banaction = ufw` — integrates bans with UFW (a ban DROPs the IP on **all** ports, incl. 2222)
 - Unban an IP: `sudo fail2ban-client set sshd unbanip <IP>` (substitute jail name as needed)
 
-#### CI deploy vs fail2ban (important)
-The GitHub Actions deploy connects from GitHub's **rotating shared runner IPs**.
-fail2ban periodically bans some of them, which makes the deploy fail with
-`ssh: connect to host … port 2222: Connection timed out` (silent UFW DROP).
-Fix is to whitelist GitHub's Actions ranges in `ignoreip`:
-- Script: `deploy/fail2ban-github-allowlist.sh` (fetches ranges from
-  `https://api.github.com/meta`, writes `[DEFAULT] ignoreip` to
-  `/etc/fail2ban/jail.d/github-actions-ignoreip.local`, reloads, clears bans).
-- Install once + run weekly via cron (ranges change). See header of the script.
-- Edit `ADMIN_IPS` in the script to include any office/static IP you rely on —
-  the generated file becomes the jails' `ignoreip`, so list everything you need.
+#### CI deploy connectivity (investigated 2026-06-09)
+Two separate problems were found and fixed:
+
+1. **fail2ban was DEAD for ~4h** — `jail.local` had a **duplicate `[sshd]`
+   section** (a manual edit appended a 2nd `[sshd]` with an `ignoreip` line).
+   fail2ban refuses any config with a duplicate section, so it crash-failed on
+   every start. Fixed: removed the duplicate; the allowlist now lives only in
+   `/etc/fail2ban/jail.d/github-actions-ignoreip.local` under `[DEFAULT]`.
+   **Gotcha for the future: never add a 2nd `[sshd]` — put overrides in jail.d.**
+
+2. **The deploy timeouts are UPSTREAM, not the VPS.** Packet capture (tcpdump on
+   :2222 during a deploy) proved that when a run *fails*, GitHub's SYN never
+   reaches the box; when it *arrives* (e.g. Azure IP 20.55.127.228), the VPS
+   answers and SSH completes in ~24s. So some GitHub/Azure runner IPs are dropped
+   on the path to the Hostinger VPS — intermittent, per-runner-IP, outside our
+   control. Re-running the workflow usually lands on a good IP. For reliable
+   deploys, move off GitHub-hosted runners' rotating IPs (self-hosted runner on
+   the VPS, or Tailscale) — see options discussed in chat.
+
+The fail2ban allowlist (`deploy/fail2ban-github-allowlist.sh`) is still worth
+keeping so the VPS never *itself* bans a runner: it fetches GitHub's Actions
+IPv4 ranges from `api.github.com/meta`, writes `[DEFAULT] ignoreip` to jail.d,
+reloads, and clears bans. Run weekly via cron (ranges change). `ADMIN_IPS` in
+the script includes the office IP `27.58.26.217` — keep it there or a cron run
+will drop it from `ignoreip`. (Cron not yet installed.)
 
 ---
 
