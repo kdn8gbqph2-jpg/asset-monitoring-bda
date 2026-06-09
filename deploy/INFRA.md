@@ -56,8 +56,20 @@ Handoff reference for future Claude sessions. Keep this file updated whenever th
 ### Fail2ban (`/etc/fail2ban/jail.local`)
 - `sshd` jail
 - 3 nginx jails (`nginx-http-auth`, `nginx-botsearch`, `nginx-limit-req`)
-- `banaction = ufw` — integrates bans with UFW
+- `banaction = ufw` — integrates bans with UFW (a ban DROPs the IP on **all** ports, incl. 2222)
 - Unban an IP: `sudo fail2ban-client set sshd unbanip <IP>` (substitute jail name as needed)
+
+#### CI deploy vs fail2ban (important)
+The GitHub Actions deploy connects from GitHub's **rotating shared runner IPs**.
+fail2ban periodically bans some of them, which makes the deploy fail with
+`ssh: connect to host … port 2222: Connection timed out` (silent UFW DROP).
+Fix is to whitelist GitHub's Actions ranges in `ignoreip`:
+- Script: `deploy/fail2ban-github-allowlist.sh` (fetches ranges from
+  `https://api.github.com/meta`, writes `[DEFAULT] ignoreip` to
+  `/etc/fail2ban/jail.d/github-actions-ignoreip.local`, reloads, clears bans).
+- Install once + run weekly via cron (ranges change). See header of the script.
+- Edit `ADMIN_IPS` in the script to include any office/static IP you rely on —
+  the generated file becomes the jails' `ignoreip`, so list everything you need.
 
 ---
 
