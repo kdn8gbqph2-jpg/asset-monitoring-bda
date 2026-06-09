@@ -775,8 +775,9 @@
                         // #1 = oldest event, #N = most recent. Rows are
                         // rendered newest-first, so the bottom row gets #1.
                         const serial = data.logs.length - i;
-                        // Shade the row by the status held during this period (New).
-                        const rowClass = pumpLogRowClass(l.newStatus);
+                        // Shade the row by the status held DURING this period — that's
+                        // OldStatus (Duration = time in Old; New is the end transition).
+                        const rowClass = pumpLogRowClass(l.oldStatus);
                         tbody.insertAdjacentHTML('beforeend', `
                             <tr class="${rowClass}">
                                 <td class="text-muted small">${serial}</td>
