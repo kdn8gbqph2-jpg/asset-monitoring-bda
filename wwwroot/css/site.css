@@ -751,10 +751,12 @@ html {
 /* ── Pump status-history row colouring ──────────────────────────────────────
    Each log row is shaded by the status the pump HELD during that period
    (the "New" status): green = running, red = stopped, amber = maintenance.
-   Targets <td> so the colour survives Bootstrap's .table-bordered cell bg. */
-.pump-log-on > td    { background-color: #e6f4ea; }   /* working — light green */
-.pump-log-off > td   { background-color: #fdecea; }   /* stopped — light red   */
-.pump-log-maint > td { background-color: #fff6e0; }   /* maintenance — amber   */
+   !important is required: Bootstrap's `.table > :not(caption) > * > *` rule
+   sets the cell background with equal specificity and loads after site.css,
+   so without it Bootstrap repaints the cells over these colours. */
+.pump-log-on > td    { background-color: #e6f4ea !important; }   /* working — light green */
+.pump-log-off > td   { background-color: #fdecea !important; }   /* stopped — light red   */
+.pump-log-maint > td { background-color: #fff6e0 !important; }   /* maintenance — amber   */
 
 .pump-log-legend {
     display: flex;
