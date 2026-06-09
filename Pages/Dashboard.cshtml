@@ -770,7 +770,7 @@
                         .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
                     data.logs.forEach((l, i) => {
                         const fmt = dt => dt ? new Date(dt).toLocaleString('en-IN') : '—';
-                        const dur = l.durationMinutes != null ? `${l.durationMinutes} min` : '—';
+                        const dur = fmtDuration(l.durationMinutes);
                         // Serial number per pump in chronological order:
                         // #1 = oldest event, #N = most recent. Rows are
                         // rendered newest-first, so the bottom row gets #1.

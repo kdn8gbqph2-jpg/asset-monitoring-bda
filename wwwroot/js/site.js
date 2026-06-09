@@ -334,3 +334,14 @@
             default:            return '';
         }
     }
+
+    // ── Duration formatter ─────────────────────────────────────────────────────
+    // Minutes → "Xh Ym" (e.g. 1309 → "21h 49m", 634 → "10h 34m", 45 → "45m").
+    function fmtDuration(minutes) {
+        if (minutes == null || minutes < 0) return '—';
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        if (h > 0 && m > 0) return `${h}h ${m}m`;
+        if (h > 0)          return `${h}h`;
+        return `${m}m`;
+    }
