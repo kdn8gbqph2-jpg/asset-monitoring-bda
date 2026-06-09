@@ -27,8 +27,8 @@
     var selYear    = Model?.Year  ?? DateTime.Now.Year;
     var selMonth   = Model?.Month ?? DateTime.Now.Month;
 
-    // Colspan for the empty-state row: 4 base + 3 today (if current) + 3 month + 1 last updated
-    var emptyColspan = isCurrent ? 11 : 8;
+    // Colspan for the empty-state row: 1 select + 4 base + 3 today (if current) + 3 month + 1 last updated
+    var emptyColspan = isCurrent ? 12 : 9;
 }
 
 <div class="card mb-4">
@@ -68,6 +68,11 @@
                     <span class="d-none d-sm-inline ms-1">CSV</span>
                 </a>
             </div>
+            <button type="button" id="downloadRunningLogBtn" class="btn btn-sm btn-primary"
+                    title="Tick one or more pumps below, then download their detailed running log (Excel) with total running hours">
+                <i class="bi bi-clipboard-data"></i>
+                <span class="d-none d-sm-inline ms-1">Running Log</span>
+            </button>
         </div>
     </div>
 
@@ -86,6 +91,9 @@
         <table class="table table-dashboard summary-table align-middle text-center">
             <thead>
                 <tr>
+                    <th rowspan="2" class="align-middle">
+                        <input type="checkbox" id="rlSelectAll" title="Select / deselect all pumps" />
+                    </th>
                     <th rowspan="2" class="align-middle text-start">PUMP ID</th>
                     <th rowspan="2" class="align-middle text-start col-hide-mobile">VENDOR</th>
                     <th rowspan="2" class="align-middle text-start col-hide-mobile">LOCATION</th>
@@ -149,6 +157,10 @@
                 foreach (var item in rows)
                 {
                     <tr>
+                        <td>
+                            <input type="checkbox" class="rl-select" value="@item.PumpId"
+                                   title="Select pump @item.PumpId for the running-log download" />
+                        </td>
                         <td class="fw-semibold text-start">
                             <a href="javascript:void(0)" class="text-primary text-decoration-none"
                                onclick="openSummaryPumpDetail(@item.PumpId, '@(item.VendorName?.Replace("'", "\\'") ?? "")', '@(item.Location?.Replace("'", "\\'") ?? "")', '@(item.Status ?? "OFF")')">
@@ -285,6 +297,33 @@
         url.searchParams.set('summaryMonth', String(parseInt(m, 10))); // strip leading zero
         window.location.href = url.toString();
     });
+})();
+
+// ── Running Log: select pumps, then download their detailed log (Excel) ───
+(function () {
+    const all = document.getElementById('rlSelectAll');
+    if (all) {
+        all.addEventListener('change', () => {
+            document.querySelectorAll('.rl-select').forEach(cb => { cb.checked = all.checked; });
+        });
+    }
+
+    const btn = document.getElementById('downloadRunningLogBtn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            const ids = Array.from(document.querySelectorAll('.rl-select:checked')).map(cb => cb.value);
+            if (ids.length === 0) {
+                alert('Tick one or more pumps (checkbox on the left) to download their running log.');
+                return;
+            }
+            const params = new URLSearchParams();
+            params.set('handler', 'DownloadRunningLogXlsx');
+            params.set('summaryYear', '@selYear');
+            params.set('summaryMonth', '@selMonth');
+            params.set('pumpIds', ids.join(','));
+            window.location.href = window.location.pathname + '?' + params.toString();
+        });
+    }
 })();
 
 function openSummaryPumpDetail(pumpId, vendor, location, status) {

@@ -344,6 +344,124 @@ namespace asset_monitoring.Services
             { FileDownloadName = fileName };
         }
 
+        // ── Running Log (detailed status-change events for selected pumps) XLSX ──
+        // One section per selected pump: the pump's month running total (authoritative,
+        // from the daily summaries) followed by its status-change events. A grand
+        // "TOTAL RUNNING HOURS" for all selected pumps is appended at the end.
+        public FileContentResult ExportRunningLogAsXlsx(
+            List<PumpRunningSummaryDto> selectedPumps,
+            Dictionary<int, List<PumpLogDto>> eventsByPump,
+            int year, int month)
+        {
+            var monthLabel = new DateTime(year, month, 1).ToString("MMMM yyyy");
+            Logger.Info("ExportRunningLogAsXlsx: {0} pumps, period={1:D4}-{2:D2}", selectedPumps.Count, year, month);
+
+            const int LASTCOL = 8;
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add($"Running Log {year:D4}-{month:D2}");
+
+            int row = 1;
+            ws.Cell(row, 1).Value = $"Pump Running Log — {monthLabel}";
+            ws.Range(row, 1, row, LASTCOL).Merge();
+            ws.Cell(row, 1).Style.Font.Bold = true;
+            ws.Cell(row, 1).Style.Font.FontSize = 14;
+            row += 2;
+
+            int grandTotalMinutes = 0;
+
+            foreach (var pump in selectedPumps)
+            {
+                int.TryParse(pump.PumpId, out var pid);
+                var events = eventsByPump.TryGetValue(pid, out var ev) ? ev : new List<PumpLogDto>();
+                grandTotalMinutes += pump.MonthRunMinutes;
+
+                // Pump section header
+                ws.Cell(row, 1).Value = $"Pump {pump.PumpId}  ·  {pump.VendorName}  ·  {pump.Location}";
+                ws.Range(row, 1, row, LASTCOL).Merge();
+                ws.Cell(row, 1).Style.Font.Bold = true;
+                ws.Cell(row, 1).Style.Font.FontColor = XLColor.White;
+                ws.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#1565C0");
+                row++;
+
+                // Authoritative monthly running total (matches the dashboard card)
+                ws.Cell(row, 1).Value = $"Total Running Hours ({monthLabel}): {(pump.MonthRunMinutes > 0 ? FormatMinutes(pump.MonthRunMinutes) : "0m")}";
+                ws.Range(row, 1, row, LASTCOL).Merge();
+                ws.Cell(row, 1).Style.Font.Bold = true;
+                ws.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#16A34A");
+                row++;
+
+                // Column headers
+                string[] cols = { "#", "Old", "New", "Started (IST)", "Ended (IST)", "Duration", "Remarks", "Operator" };
+                for (int c = 0; c < cols.Length; c++)
+                {
+                    var cell = ws.Cell(row, c + 1);
+                    cell.Value = cols[c];
+                    cell.Style.Font.Bold = true;
+                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#E3F2FD");
+                }
+                row++;
+
+                if (events.Count == 0)
+                {
+                    ws.Cell(row, 1).Value = "No status-change events in this month.";
+                    ws.Range(row, 1, row, LASTCOL).Merge();
+                    ws.Cell(row, 1).Style.Font.Italic = true;
+                    ws.Cell(row, 1).Style.Font.FontColor = XLColor.Gray;
+                    row++;
+                }
+                else
+                {
+                    int serial = 1;
+                    foreach (var e in events)
+                    {
+                        int col = 1;
+                        ws.Cell(row, col++).Value = serial++;
+                        ws.Cell(row, col++).Value = e.OldStatus;
+                        ws.Cell(row, col++).Value = e.NewStatus;
+                        ws.Cell(row, col++).Value = e.StartTime.HasValue
+                            ? ToIst(e.StartTime.Value).ToString("dd MMM yyyy, hh:mm tt") : "—";
+                        ws.Cell(row, col++).Value = e.EndTime.HasValue
+                            ? ToIst(e.EndTime.Value).ToString("dd MMM yyyy, hh:mm tt") : "—";
+                        ws.Cell(row, col++).Value = e.DurationMinutes.HasValue
+                            ? FormatMinutes(e.DurationMinutes.Value) : "—";
+                        ws.Cell(row, col++).Value = e.Remarks ?? "";
+                        ws.Cell(row, col++).Value = e.UpdatedBy ?? "";
+
+                        // Tint by the status held during the period (Old): green=running.
+                        var tint = e.OldStatus switch
+                        {
+                            "ON"          => "#E6F4EA",
+                            "OFF"         => "#FDECEA",
+                            "MAINTENANCE" => "#FFF6E0",
+                            _             => null
+                        };
+                        if (tint != null)
+                            ws.Range(row, 1, row, LASTCOL).Style.Fill.BackgroundColor = XLColor.FromHtml(tint);
+                        row++;
+                    }
+                }
+                row++; // spacer between pumps
+            }
+
+            // Grand total across all selected pumps
+            ws.Cell(row, 1).Value =
+                $"TOTAL RUNNING HOURS — {selectedPumps.Count} pump(s), {monthLabel}: {(grandTotalMinutes > 0 ? FormatMinutes(grandTotalMinutes) : "0m")}";
+            ws.Range(row, 1, row, LASTCOL).Merge();
+            ws.Cell(row, 1).Style.Font.Bold = true;
+            ws.Cell(row, 1).Style.Font.FontSize = 12;
+            ws.Cell(row, 1).Style.Font.FontColor = XLColor.White;
+            ws.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#16A34A");
+
+            ws.Columns().AdjustToContents();
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            var fileName = $"PumpRunningLog_{year:D4}-{month:D2}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            return new FileContentResult(ms.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            { FileDownloadName = fileName };
+        }
+
         // ── Running Summary PDF ──────────────────────────────────────────────
         public FileContentResult ExportRunningSummaryAsPdf(
             List<PumpRunningSummaryDto> rows, int year, int month, bool isCurrentMonth)

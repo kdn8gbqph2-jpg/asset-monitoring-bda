@@ -235,5 +235,38 @@ namespace asset_monitoring.Pages
                 return StatusCode(500, $"Failed to generate running summary {format}");
             }
         }
+
+        // ── Running Log download (detailed status-change events for selected pumps) ──
+        public Task<IActionResult> OnGetDownloadRunningLogXlsxAsync(string? pumpIds, int? summaryYear, int? summaryMonth)
+            => ExportRunningLog(pumpIds, summaryYear, summaryMonth);
+
+        private async Task<IActionResult> ExportRunningLog(string? pumpIds, int? year, int? month)
+        {
+            if (!IsLoggedIn || (UserType != "JE" && UserType != "ADMIN")) return RedirectToPage("/Index");
+            try
+            {
+                var ids = ParsePumpIds(pumpIds);
+                if (ids.Count == 0) return BadRequest("No pumps selected.");
+
+                var summary  = await _pumpService.GetPumpRunningSummaryAsync(UserId, UserType, year, month);
+                var selected = summary.Rows
+                    .Where(r => int.TryParse(r.PumpId, out var pid) && ids.Contains(pid))
+                    .ToList();
+                if (selected.Count == 0) return BadRequest("Selected pumps are not available.");
+
+                var selectedIds = selected.Select(r => int.Parse(r.PumpId)).ToList();
+                var events = await _pumpService.GetPumpRunningLogAsync(selectedIds, summary.Year, summary.Month);
+                var byPump = events.GroupBy(e => e.PumpId).ToDictionary(g => g.Key, g => g.ToList());
+
+                Logger.Info("JE ExportRunningLog: {0} pumps, {1} events, period={2}-{3}, userId={4}",
+                    selected.Count, events.Count, summary.Year, summary.Month, UserId);
+                return _reportExportService.ExportRunningLogAsXlsx(selected, byPump, summary.Year, summary.Month);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "JE ExportRunningLog failed");
+                return StatusCode(500, "Failed to generate running log");
+            }
+        }
     }
 }

@@ -39,6 +39,7 @@ namespace asset_monitoring.Services
     public class PumpLogDto
     {
         public int LogId { get; set; }
+        public int PumpId { get; set; }
         public string OldStatus { get; set; } = "-";
         public string NewStatus { get; set; } = "";
         public DateTime? StartTime { get; set; }
@@ -421,6 +422,7 @@ namespace asset_monitoring.Services
                 return rows.Select(l => new PumpLogDto
                 {
                     LogId           = l.LogId,
+                    PumpId          = l.PumpId,
                     OldStatus       = l.OldStatus.HasValue
                                         ? StatusLabel(l.OldStatus.Value) : "-",
                     NewStatus       = StatusLabel(l.NewStatus),
@@ -436,6 +438,52 @@ namespace asset_monitoring.Services
             catch (Exception ex)
             {
                 Logger.Error(ex, "GetPumpLogsAsync failed for pumpId={0}", pumpId);
+                throw;
+            }
+        }
+
+        // ── Detailed running log (status-change events) for selected pumps in a month ──
+        // Returns the events whose period ENDED within the selected IST month, ordered
+        // by pump then chronologically. Used by the "Download Running Log" feature.
+        public async Task<List<PumpLogDto>> GetPumpRunningLogAsync(List<int> pumpIds, int year, int month)
+        {
+            Logger.Debug("GetPumpRunningLogAsync: {0} pumps, period={1:D4}-{2:D2}", pumpIds?.Count ?? 0, year, month);
+            if (pumpIds == null || pumpIds.Count == 0) return new List<PumpLogDto>();
+            try
+            {
+                // Month boundaries are IST; pump_status_log timestamps are UTC — convert.
+                var istStart = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+                var istEnd   = istStart.AddMonths(1);
+                var utcStart = TimeZoneInfo.ConvertTimeToUtc(istStart, Ist);
+                var utcEnd   = TimeZoneInfo.ConvertTimeToUtc(istEnd, Ist);
+
+                var rows = await _db.PumpStatusLogs
+                    .Where(l => pumpIds.Contains(l.PumpId)
+                             && l.EndTime != null
+                             && l.EndTime >= utcStart
+                             && l.EndTime <  utcEnd)
+                    .OrderBy(l => l.PumpId).ThenBy(l => l.StartTime)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                return rows.Select(l => new PumpLogDto
+                {
+                    LogId           = l.LogId,
+                    PumpId          = l.PumpId,
+                    OldStatus       = l.OldStatus.HasValue ? StatusLabel(l.OldStatus.Value) : "-",
+                    NewStatus       = StatusLabel(l.NewStatus),
+                    StartTime       = AsUtc(l.StartTime),
+                    EndTime         = AsUtc(l.EndTime),
+                    DurationMinutes = l.StartTime.HasValue && l.EndTime.HasValue
+                                        ? (int)(l.EndTime.Value - l.StartTime.Value).TotalMinutes
+                                        : null,
+                    Remarks         = l.Remarks,
+                    UpdatedBy       = l.UpdatedBy
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "GetPumpRunningLogAsync failed");
                 throw;
             }
         }

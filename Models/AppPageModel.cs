@@ -32,6 +32,20 @@ namespace asset_monitoring.Models
             return RedirectToPage("/Index");
         }
 
+        /// <summary>
+        /// Parse a comma-separated pump-id list (from the running-log download UI),
+        /// keeping only positive integers. Used by the running-log export handlers.
+        /// </summary>
+        protected static List<int> ParsePumpIds(string? csv)
+        {
+            if (string.IsNullOrWhiteSpace(csv)) return new List<int>();
+            return csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                      .Select(s => int.TryParse(s, out var v) ? v : -1)
+                      .Where(v => v > 0)
+                      .Distinct()
+                      .ToList();
+        }
+
         // ═════════════════════════════════════════════════════════════════════
         //  SHARED HANDLER — Change password (self-service, post-login)
         //  Available on any page that inherits AppPageModel (Operator, JE, Admin)
