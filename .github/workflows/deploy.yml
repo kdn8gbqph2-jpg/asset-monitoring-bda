@@ -17,8 +17,10 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # Publish the web project explicitly. Without the project path, the SDK
+      # treats the directory as a solution build and warns that -o is unsupported.
       - name: Publish app
-        run: dotnet publish -c Release -o ./publish
+        run: dotnet publish asset-monitoring.csproj -c Release -o ./publish
 
       - name: Create deployment archive
         run: tar -czf deploy.tar.gz -C ./publish .
@@ -34,6 +36,7 @@ jobs:
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 12      # don't let a stuck SSH session hang for 14+ minutes
 
     steps:
       - name: Download build artifact
@@ -41,52 +44,104 @@ jobs:
         with:
           name: app-build
 
+      # Native ssh/scp with retry+backoff. GitHub runners use rotating shared
+      # IPs; if one is dropped by the VPS firewall (fail2ban → UFW), the SYN is
+      # silently discarded and the connect times out. Retrying gives a transient
+      # drop another chance; ConnectTimeout fails fast instead of hanging.
+      - name: Set up SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Pre-trust the host key; fall back to accept-new on first connect.
+          ssh-keyscan -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
       - name: Copy archive to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          port: ${{ secrets.VPS_PORT }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: deploy.tar.gz
-          target: /tmp
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "::group::SCP attempt $attempt"
+            if scp -P "$VPS_PORT" -i ~/.ssh/deploy_key \
+                   -o StrictHostKeyChecking=accept-new \
+                   -o ConnectTimeout=30 \
+                   deploy.tar.gz "$VPS_USER@$VPS_HOST:/tmp/deploy.tar.gz"; then
+              echo "SCP succeeded on attempt $attempt"
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "SCP attempt $attempt failed; backing off $((attempt * 20))s..."
+            sleep $((attempt * 20))
+          done
+          echo "SCP failed after 5 attempts — VPS SSH port unreachable from this runner IP."
+          exit 1
 
       - name: Deploy and restart service
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          port: ${{ secrets.VPS_PORT }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            echo "Stopping service..."
-            sudo systemctl stop asset-monitoring
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          # Remote script (quoted heredoc → no local/GHA expansion).
+          cat > deploy_remote.sh <<'REMOTE'
+          set -e
+          echo "Stopping service..."
+          sudo systemctl stop asset-monitoring
 
-            echo "Backing up production config..."
-            sudo cp /var/www/asset-monitoring/appsettings.Production.json /tmp/appsettings.Production.json.bak
+          echo "Backing up production config..."
+          sudo cp /var/www/asset-monitoring/appsettings.Production.json /tmp/appsettings.Production.json.bak
 
-            echo "Deploying new build..."
-            sudo tar -xzf /tmp/deploy.tar.gz -C /var/www/asset-monitoring
+          echo "Deploying new build..."
+          sudo tar -xzf /tmp/deploy.tar.gz -C /var/www/asset-monitoring
 
-            echo "Restoring production config..."
-            sudo cp /tmp/appsettings.Production.json.bak /var/www/asset-monitoring/appsettings.Production.json
-            sudo rm -f /tmp/appsettings.Production.json.bak
+          echo "Restoring production config..."
+          sudo cp /tmp/appsettings.Production.json.bak /var/www/asset-monitoring/appsettings.Production.json
+          sudo rm -f /tmp/appsettings.Production.json.bak
 
-            sudo chown -R www-data:www-data /var/www/asset-monitoring
+          sudo chown -R www-data:www-data /var/www/asset-monitoring
 
-            echo "Starting service..."
-            sudo systemctl start asset-monitoring
+          echo "Starting service..."
+          sudo systemctl start asset-monitoring
 
-            echo "Cleaning up..."
-            rm -f /tmp/deploy.tar.gz
+          echo "Cleaning up..."
+          rm -f /tmp/deploy.tar.gz
 
-            # Wait and verify
-            sleep 3
-            if sudo systemctl is-active --quiet asset-monitoring; then
-              echo "Deployment successful - service is running"
-            else
-              echo "Deployment FAILED - service is not running"
-              sudo journalctl -u asset-monitoring --since "30 seconds ago" --no-pager
-              exit 1
+          sleep 3
+          if sudo systemctl is-active --quiet asset-monitoring; then
+            echo "Deployment successful - service is running"
+          else
+            echo "Deployment FAILED - service is not running"
+            sudo journalctl -u asset-monitoring --since "30 seconds ago" --no-pager
+            exit 1
+          fi
+          REMOTE
+
+          for attempt in 1 2 3; do
+            echo "::group::SSH deploy attempt $attempt"
+            if ssh -p "$VPS_PORT" -i ~/.ssh/deploy_key \
+                   -o StrictHostKeyChecking=accept-new \
+                   -o ConnectTimeout=30 \
+                   -o ServerAliveInterval=15 \
+                   -o ServerAliveCountMax=4 \
+                   "$VPS_USER@$VPS_HOST" 'bash -s' < deploy_remote.sh; then
+              echo "Deploy succeeded on attempt $attempt"
+              echo "::endgroup::"
+              exit 0
             fi
+            echo "::endgroup::"
+            echo "Deploy attempt $attempt failed; backing off $((attempt * 30))s..."
+            sleep $((attempt * 30))
+          done
+          echo "Deploy failed after 3 attempts."
+          exit 1
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key deploy_remote.sh
