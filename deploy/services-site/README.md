@@ -60,9 +60,18 @@ No Nginx reload needed for content changes — just overwrite the files.
 
 ## Editing the service list
 
-Edit `index.html`. Each service is one `<div class="col-sm-6 col-lg-3">…</div>` block — copy one as a template to add a new service.
+Edit `index.html`. Each service is one `<a class="service-card">…</a>` block directly inside
+`<div class="row">` — copy one as a template to add/remove a service. **If you change the service
+list, also update the matching entry in the JSON-LD `ItemList` in `<head>` and bump `numberOfItems`**
+so the structured data stays in sync with what's on the page (this is what search engines read).
 
-Icon classes use Bootstrap Icons (full list: https://icons.getbootstrap.com). Tile colour classes available: `tile-blue`, `tile-orange`, `tile-green`, `tile-purple`.
+Icons are **inline SVG** — no icon font is loaded. Copy a glyph's `<svg>…</svg>` from
+https://icons.getbootstrap.com and paste it into the `.icon-tile`.
+Tile colour classes: `tile-blue`, `tile-orange`, `tile-green`, `tile-purple`, `tile-teal`, `tile-indigo`.
+
+> ⚠️ **The live server is the source of truth that must match this repo.** Earlier, the live page
+> was hand-edited on the VPS without committing back here, so the repo fell behind. Always edit
+> here, commit, then deploy — don't hand-edit files in `/var/www/services-bdabharatpur/`.
 
 ## Local preview
 

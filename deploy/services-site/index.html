@@ -6,7 +6,7 @@
 
     <title>Bharatpur Development Authority (BDA) &mdash; Online Services</title>
     <meta name="description"
-          content="Official online services of the Bharatpur Development Authority (BDA) in Bharatpur, Rajasthan: pump monitoring (PMS), document archive (DMS), E-Works and E-Accounts portals." />
+          content="Official online services of the Bharatpur Development Authority (BDA), Bharatpur, Rajasthan: pump monitoring (PMS), document archive (DMS), E-Works, Work Dashboard, E-Accounts and land records (LMIS)." />
 
     <link rel="canonical" href="https://services.bdabharatpur.org/" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
@@ -21,7 +21,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Bharatpur Development Authority" />
     <meta property="og:title" content="Bharatpur Development Authority (BDA) — Online Services" />
-    <meta property="og:description" content="Official gateway to all BDA online portals: Pump Management (PMS), Document Management (DMS), E-Works and E-Accounts." />
+    <meta property="og:description" content="Official gateway to all BDA online portals: Pump Management (PMS), Document Management (DMS), E-Works, Work Dashboard, E-Accounts and Land Records (LMIS)." />
     <meta property="og:url" content="https://services.bdabharatpur.org/" />
     <meta property="og:image" content="https://services.bdabharatpur.org/bda-logo.png" />
     <meta property="og:image:alt" content="Bharatpur Development Authority logo" />
@@ -31,18 +31,19 @@
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@Bdabharatpur" />
     <meta name="twitter:title" content="Bharatpur Development Authority (BDA) — Online Services" />
-    <meta name="twitter:description" content="Official gateway to all BDA online portals: Pump Management (PMS), Document Management (DMS), E-Works and E-Accounts." />
+    <meta name="twitter:description" content="Official gateway to all BDA online portals: PMS, DMS, E-Works, Work Dashboard, E-Accounts and LMIS." />
     <meta name="twitter:image" content="https://services.bdabharatpur.org/bda-logo.png" />
 
     <!-- Icons (bda-logo.png reused as a stopgap; generate sized PNGs later) -->
     <link rel="icon" type="image/png" href="/bda-logo.png" />
     <link rel="apple-touch-icon" href="/bda-logo.png" />
 
-    <!-- Self-hosted CSS only — Bootstrap + bootstrap-icons CDN removed (icons are inline SVG below) -->
+    <!-- Self-hosted CSS only — Bootstrap, bootstrap-icons and Font Awesome CDNs removed (icons are inline SVG below) -->
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Structured data: establishes the BDA entity + lists the services -->
+    <!-- Structured data: establishes the BDA entity + lists all services -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -60,7 +61,12 @@
           "areaServed": { "@type": "City", "name": "Bharatpur, Rajasthan, India" },
           "parentOrganization": { "@type": "GovernmentOrganization", "name": "Government of Rajasthan", "url": "https://rajasthan.gov.in/" },
           "contactPoint": { "@type": "ContactPoint", "contactType": "customer support", "email": "bdabharatpur@rajasthan.gov.in", "areaServed": "IN", "availableLanguage": ["Hindi", "English"] },
-          "sameAs": ["https://bhda.rajasthan.gov.in/home/dptHome"]
+          "sameAs": [
+            "https://bhda.rajasthan.gov.in/home/dptHome",
+            "https://www.facebook.com/bda.urban.rajasthan.gov.in/",
+            "https://www.instagram.com/bdabharatpurofficial/",
+            "https://x.com/Bdabharatpur"
+          ]
         },
         {
           "@type": "WebSite",
@@ -75,13 +81,15 @@
           "@id": "https://services.bdabharatpur.org/#services",
           "name": "BDA Digital Services",
           "description": "Directory of digital services offered by the Bharatpur Development Authority.",
-          "numberOfItems": 4,
+          "numberOfItems": 6,
           "itemListOrder": "https://schema.org/ItemListUnordered",
           "itemListElement": [
             { "@type": "ListItem", "position": 1, "item": { "@type": "WebApplication", "name": "Pump Management System (PMS)", "applicationCategory": "GovernmentApplication", "url": "https://pms.bdabharatpur.org", "description": "Real-time monitoring of Bharatpur's monsoon drainage pumps with operator-logged on/off status and running hours.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } },
             { "@type": "ListItem", "position": 2, "item": { "@type": "WebApplication", "name": "Document Management System (DMS)", "applicationCategory": "GovernmentApplication", "url": "https://archives-bda.cloud/Identity/Account/Login", "description": "Digital archive of BDA records, files and scanned documents.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } },
             { "@type": "ListItem", "position": 3, "item": { "@type": "WebApplication", "name": "E-Works — Engineering Works", "applicationCategory": "GovernmentApplication", "url": "https://www.e-nagar.com/engineering/bharatpur/uengineeringadmin/index.php", "description": "BDA engineering works portal for project tracking, tenders and work orders in Bharatpur.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } },
-            { "@type": "ListItem", "position": 4, "item": { "@type": "WebApplication", "name": "E-Accounts — Accounts & Finance", "applicationCategory": "GovernmentApplication", "url": "https://www.e-nagar.com/accounts/bharatpur/index.php", "description": "Accounts and financial-management portal for BDA operations, payments and ledgers.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } }
+            { "@type": "ListItem", "position": 4, "item": { "@type": "WebApplication", "name": "Work Dashboard", "applicationCategory": "GovernmentApplication", "url": "https://works.bdabharatpur.org", "description": "Track and monitor BDA civil works in Bharatpur — progress, contractors, remarks and engineer assignments.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } },
+            { "@type": "ListItem", "position": 5, "item": { "@type": "WebApplication", "name": "E-Accounts — Accounts & Finance", "applicationCategory": "GovernmentApplication", "url": "https://www.e-nagar.com/accounts/bharatpur/index.php", "description": "Accounts and financial-management portal for BDA operations, payments and ledgers.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } },
+            { "@type": "ListItem", "position": 6, "item": { "@type": "WebApplication", "name": "LMIS — Land Management Information System", "applicationCategory": "GovernmentApplication", "url": "https://lmis.bdabharatpur.org", "description": "Land Management Information System for the Bharatpur Development Authority — colony layouts, khasra records and patta ledger.", "provider": { "@id": "https://services.bdabharatpur.org/#org" } } }
           ]
         },
         {
@@ -89,7 +97,7 @@
           "@id": "https://services.bdabharatpur.org/#faq",
           "mainEntity": [
             { "@type": "Question", "name": "What is the Bharatpur Development Authority (BDA)?", "acceptedAnswer": { "@type": "Answer", "text": "The Bharatpur Development Authority (भरतपुर विकास प्राधिकरण) is the urban development body for Bharatpur, Rajasthan. This page links to its online services." } },
-            { "@type": "Question", "name": "How do I log in to a BDA portal?", "acceptedAnswer": { "@type": "Answer", "text": "Open the service you need from the cards above — each portal (PMS, DMS, E-Works, E-Accounts) has its own sign-in page. There is no separate login on this hub page." } },
+            { "@type": "Question", "name": "How do I log in to a BDA portal?", "acceptedAnswer": { "@type": "Answer", "text": "Open the service you need from the cards above — each portal (PMS, DMS, E-Works, Work Dashboard, E-Accounts, LMIS) has its own sign-in page. There is no separate login on this hub page." } },
             { "@type": "Question", "name": "Where can I monitor Bharatpur drainage pumps?", "acceptedAnswer": { "@type": "Answer", "text": "Use the Pump Management System (PMS) card above, which opens pms.bdabharatpur.org." } },
             { "@type": "Question", "name": "How do I contact the BDA?", "acceptedAnswer": { "@type": "Answer", "text": "Email bdabharatpur@rajasthan.gov.in or visit the official website at bhda.rajasthan.gov.in." } }
           ]
@@ -102,7 +110,7 @@
 
 <!-- ================= NAVBAR ================= -->
 <header class="site-nav">
-    <div class="container d-flex align-items-center py-2">
+    <div class="container d-flex align-items-center justify-content-center py-3">
         <img src="bda-logo.png" alt="Bharatpur Development Authority logo" class="nav-logo"
              width="38" height="40" decoding="async" />
         <span class="nav-title ms-2">Bharatpur Development Authority</span>
@@ -114,14 +122,14 @@
     <div class="container">
         <h1 class="fw-bold mb-2">Bharatpur Development Authority &mdash; Online Services</h1>
         <p class="lead mb-1" lang="hi">भरतपुर विकास प्राधिकरण (BDA) — सभी ऑनलाइन सेवाएँ एक जगह</p>
-        <p class="lead mb-0">A single gateway to all BDA online portals &mdash; pump monitoring, document archives, engineering works and accounts.</p>
+        <p class="lead mb-0">A single gateway to all BDA online portals.</p>
     </div>
 </section>
 
 <!-- ================= INTRO (crawlable entity text) ================= -->
 <section class="container py-4">
-    <p class="intro-lead">The <strong>Bharatpur Development Authority (BDA)</strong> &mdash; <span lang="hi">भरतपुर विकास प्राधिकरण</span> &mdash; is the urban development body for Bharatpur, Rajasthan. This page is the official gateway to BDA's online services: monsoon drainage <strong>pump monitoring</strong>, the <strong>document archive (DMS)</strong>, the <strong>engineering works (E-Works)</strong> portal, and <strong>accounts (E-Accounts)</strong>. Select a service below to open its portal. For department information and notices, visit the <a href="https://bhda.rajasthan.gov.in/home/dptHome" target="_blank" rel="noopener">official BDA website on rajasthan.gov.in</a>.</p>
-    <p class="intro-lead" lang="hi">भरतपुर विकास प्राधिकरण (बीडीए) भरतपुर, राजस्थान का नगर विकास निकाय है। यह पृष्ठ बीडीए की सभी ऑनलाइन सेवाओं — पंप (जल निकासी) निगरानी, दस्तावेज़ संग्रह, अभियांत्रिकी कार्य, और लेखा — का एकल आधिकारिक प्रवेश-द्वार है।</p>
+    <p class="intro-lead">The <strong>Bharatpur Development Authority (BDA)</strong> &mdash; <span lang="hi">भरतपुर विकास प्राधिकरण</span> &mdash; is the urban development body for Bharatpur, Rajasthan. This page is the official gateway to BDA's online services: monsoon drainage <strong>pump monitoring</strong>, the <strong>document archive (DMS)</strong>, <strong>engineering works (E-Works)</strong>, the <strong>works dashboard</strong>, <strong>accounts (E-Accounts)</strong>, and <strong>land records (LMIS)</strong>. Select a service below to open its portal. For department information and notices, visit the <a href="https://bhda.rajasthan.gov.in/home/dptHome" target="_blank" rel="noopener">official BDA website on rajasthan.gov.in</a>.</p>
+    <p class="intro-lead" lang="hi">भरतपुर विकास प्राधिकरण (बीडीए) भरतपुर, राजस्थान का नगर विकास निकाय है। यह पृष्ठ बीडीए की सभी ऑनलाइन सेवाओं — पंप (जल निकासी) निगरानी, दस्तावेज़ संग्रह, अभियांत्रिकी कार्य, कार्य डैशबोर्ड, लेखा, और भूमि रिकॉर्ड (LMIS) — का एकल आधिकारिक प्रवेश-द्वार है।</p>
 </section>
 
 <!-- ================= SERVICES GRID ================= -->
@@ -134,7 +142,7 @@
                 <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 9.31a.91.91 0 1 0 1.302 1.258l3.434-4.297a.39.39 0 0 0-.029-.518z"/><path fill-rule="evenodd" d="M0 10a8 8 0 1 1 15.547 2.661c-.442 1.298-1.693 1.84-2.617 1.84H3.07c-.924 0-2.175-.542-2.617-1.84A8 8 0 0 1 0 10m8-7a7 7 0 0 0-6.603 9.329c.203.604.781.91 1.674.91h9.858c.893 0 1.47-.306 1.674-.91A7 7 0 0 0 8 3"/></svg>
             </div>
             <h2 class="card-title">Pump Management System (PMS)</h2>
-            <p class="card-desc">Real-time monitoring of Bharatpur's monsoon drainage pumps with operator-logged on/off status, running hours and history. Staff sign in to log and review pump activity.</p>
+            <p class="card-desc">Real-time monitoring of Bharatpur's monsoon drainage pumps with operator-logged on/off status, running hours and history.</p>
             <p class="card-desc-hi" lang="hi">भरतपुर के मानसून जल निकासी पंपों की वास्तविक-समय निगरानी, चालू/बंद स्थिति और रनिंग आवर्स के साथ।</p>
             <span class="card-host">pms.bdabharatpur.org</span>
             <span class="card-arrow">Open <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg></span>
@@ -164,6 +172,18 @@
             <span class="card-arrow">Open <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg></span>
         </a>
 
+        <!-- Work Dashboard -->
+        <a href="https://works.bdabharatpur.org" target="_blank" rel="noopener" class="service-card">
+            <div class="icon-tile tile-teal">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-11zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/></svg>
+            </div>
+            <h2 class="card-title">Work Dashboard</h2>
+            <p class="card-desc">Track and monitor civil works &mdash; progress, contractors, remarks, and engineer assignments.</p>
+            <p class="card-desc-hi" lang="hi">सिविल कार्यों की प्रगति, ठेकेदार, टिप्पणियाँ और अभियंता आवंटन की निगरानी।</p>
+            <span class="card-host">works.bdabharatpur.org</span>
+            <span class="card-arrow">Open <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg></span>
+        </a>
+
         <!-- E-Accounts -->
         <a href="https://www.e-nagar.com/accounts/bharatpur/index.php" target="_blank" rel="noopener" class="service-card">
             <div class="icon-tile tile-purple">
@@ -173,6 +193,18 @@
             <p class="card-desc">Accounts and financial-management portal for BDA operations, payments and ledgers.</p>
             <p class="card-desc-hi" lang="hi">बीडीए संचालन, भुगतान और बहीखातों के लिए लेखा एवं वित्तीय प्रबंधन पोर्टल।</p>
             <span class="card-host">e-nagar.com</span>
+            <span class="card-arrow">Open <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg></span>
+        </a>
+
+        <!-- LMIS -->
+        <a href="https://lmis.bdabharatpur.org" target="_blank" rel="noopener" class="service-card">
+            <div class="icon-tile tile-indigo">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+            </div>
+            <h2 class="card-title">LMIS &mdash; Land Records</h2>
+            <p class="card-desc">Land Management Information System &mdash; colony layouts, khasra records, and patta ledger.</p>
+            <p class="card-desc-hi" lang="hi">भूमि प्रबंधन सूचना प्रणाली — कॉलोनी ले-आउट, खसरा रिकॉर्ड और पट्टा बही।</p>
+            <span class="card-host">lmis.bdabharatpur.org</span>
             <span class="card-arrow">Open <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg></span>
         </a>
 
@@ -187,7 +219,7 @@
     <p>The Bharatpur Development Authority (<span lang="hi">भरतपुर विकास प्राधिकरण</span>) is the urban development body for Bharatpur, Rajasthan. This page links to its online services.</p>
 
     <h3>How do I log in to a BDA portal?</h3>
-    <p>Open the service you need from the cards above &mdash; each portal (PMS, DMS, E-Works, E-Accounts) has its own sign-in page. There is no separate login on this hub page.</p>
+    <p>Open the service you need from the cards above &mdash; each portal (PMS, DMS, E-Works, Work Dashboard, E-Accounts, LMIS) has its own sign-in page. There is no separate login on this hub page.</p>
 
     <h3>Where can I monitor Bharatpur drainage pumps?</h3>
     <p>Use the Pump Management System (PMS) card above, which opens pms.bdabharatpur.org.</p>
@@ -197,14 +229,26 @@
 </section>
 
 <!-- ================= FOOTER ================= -->
-<footer class="site-footer text-center py-3">
+<footer class="site-footer text-center">
     <div class="container">
-        <p class="mb-1">
+        <div class="footer-social">
+            <span class="footer-social-label">Follow us</span>
+            <a href="https://www.instagram.com/bdabharatpurofficial/" target="_blank" rel="noopener" class="social-link social-instagram" title="Instagram" aria-label="BDA on Instagram">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.917 3.917 0 0 0-1.417.923A3.927 3.927 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.916 3.916 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.926 3.926 0 0 0-.923-1.417A3.911 3.911 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0h.003zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599.28.28.453.546.598.92.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.47 2.47 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.478 2.478 0 0 1-.92-.598 2.48 2.48 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233 0-2.136.008-2.388.046-3.231.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92.28-.28.546-.453.92-.598.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045v.002zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92zm-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217zm0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334z"/></svg>
+            </a>
+            <a href="https://www.facebook.com/bda.urban.rajasthan.gov.in/" target="_blank" rel="noopener" class="social-link social-facebook" title="Facebook" aria-label="BDA on Facebook">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z"/></svg>
+            </a>
+            <a href="https://x.com/Bdabharatpur" target="_blank" rel="noopener" class="social-link social-x" title="X (Twitter)" aria-label="BDA on X (Twitter)">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865l8.875 11.633Z"/></svg>
+            </a>
+        </div>
+        <p class="mb-1 small text-muted">
             &copy; <span id="year"></span> Bharatpur Development Authority. All rights reserved.
         </p>
-        <p class="mb-0 small text-muted">
+        <p class="mb-0 small">
             <a href="https://bhda.rajasthan.gov.in/home/dptHome" target="_blank" rel="noopener">Official website</a>
-            <span class="mx-2">&middot;</span>
+            <span class="mx-2 text-muted">&middot;</span>
             <a href="mailto:bdabharatpur@rajasthan.gov.in">bdabharatpur@rajasthan.gov.in</a>
         </p>
     </div>

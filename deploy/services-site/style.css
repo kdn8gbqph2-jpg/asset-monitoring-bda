@@ -1,7 +1,7 @@
 /* ─── BDA Services — shared theme with PMS ───────────────────────────────
    Self-contained: the few Bootstrap grid/utility classes the page used are
-   ported here so we no longer load Bootstrap (or its icon webfont) from a CDN.
-   Icons are inline SVG in index.html. */
+   ported here so we no longer load Bootstrap, its icon webfont, or Font
+   Awesome from a CDN. All icons are inline SVG in index.html. */
 :root {
     --bda-primary:      #2563EB;
     --bda-primary-dark: #1651b8;
@@ -27,6 +27,7 @@ body { min-height: 100vh; display: flex; flex-direction: column; margin: 0; }
 .container { width: 100%; max-width: 1140px; margin-inline: auto; padding-inline: 1rem; }
 .d-flex { display: flex; }
 .align-items-center { align-items: center; }
+.justify-content-center { justify-content: center; }
 .text-center { text-align: center; }
 .fw-bold { font-weight: 700; }
 .lead { font-size: 1.15rem; }
@@ -44,25 +45,33 @@ body { min-height: 100vh; display: flex; flex-direction: column; margin: 0; }
 .ms-2 { margin-left: .5rem; }
 .mx-2 { margin-inline: .5rem; }
 
+/* Responsive card grid — 1 / 2 / 3 columns (6 services → two tidy rows of 3) */
 .row { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
 @media (min-width: 576px) { .row { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 992px) { .row { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 992px) { .row { grid-template-columns: repeat(3, 1fr); } }
 
 /* ─── Navbar ─────────────────────────────────────────────────────────── */
-.site-nav { background: var(--bda-primary-dark); color: #fff; }
-.nav-logo { height: 40px; width: auto; background: #fff; padding: 4px; border-radius: 6px; }
-.nav-title { font-weight: 600; font-size: 1.15rem; letter-spacing: .2px; }
+.site-nav {
+    background: var(--bda-primary-dark);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, .12);
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.nav-logo { height: 40px; width: auto; background: #fff; padding: 4px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.nav-title { font-weight: 600; font-size: 1.2rem; letter-spacing: .35px; }
 
 /* ─── Hero ───────────────────────────────────────────────────────────── */
 .hero {
     background: linear-gradient(135deg, #1651b8 0%, #2563EB 100%);
     color: #fff;
-    padding: 3rem 1rem 3.5rem;
-    border-radius: 0 0 18px 18px;
+    padding-block: 3.25rem 3.75rem;
+    padding-inline: 1rem;
+    border-radius: 0 0 22px 22px;
     margin-bottom: 2.5rem;
+    box-shadow: 0 10px 24px -16px rgba(37, 99, 235, .45);
 }
-.hero h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); }
-.hero p  { opacity: .92; }
+.hero h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); letter-spacing: -.3px; }
+.hero p  { opacity: .92; font-size: 1.05rem; max-width: 36rem; margin-inline: auto; }
 
 /* ─── Intro ──────────────────────────────────────────────────────────── */
 .intro-lead { max-width: 760px; margin-inline: auto; color: var(--bda-text); line-height: 1.6; }
@@ -101,6 +110,8 @@ body { min-height: 100vh; display: flex; flex-direction: column; margin: 0; }
 .tile-orange { background: #FFEDD5; color: #C2410C; }
 .tile-green  { background: #DCFCE7; color: #15803D; }
 .tile-purple { background: #EDE9FE; color: #6D28D9; }
+.tile-teal   { background: #CCFBF1; color: #0F766E; }
+.tile-indigo { background: #E0E7FF; color: #4338CA; }
 
 .card-title { font-weight: 700; font-size: 1.15rem; margin-bottom: .4rem; color: var(--bda-primary-dark); }
 .card-desc  { color: var(--bda-muted); font-size: .9rem; margin-bottom: .4rem; line-height: 1.45; }
@@ -117,6 +128,21 @@ body { min-height: 100vh; display: flex; flex-direction: column; margin: 0; }
 .faq-wrap p  { color: var(--bda-text); line-height: 1.55; margin-top: 0; }
 
 /* ─── Footer ─────────────────────────────────────────────────────────── */
-.site-footer { background: #fff; border-top: 1px solid var(--bda-border); color: var(--bda-text); }
+.site-footer { background: #fff; border-top: 1px solid var(--bda-border); color: var(--bda-text); padding-block: 1.5rem; }
 .site-footer a { color: var(--bda-primary); text-decoration: none; }
 .site-footer a:hover { text-decoration: underline; }
+
+/* ─── Footer social links ────────────────────────────────────────────── */
+.footer-social { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+.footer-social-label { color: var(--bda-muted); font-size: .9rem; font-weight: 500; margin-right: .25rem; }
+.footer-social .social-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 50%;
+    color: #fff; text-decoration: none; border: none;
+    transition: transform .15s, box-shadow .15s, filter .15s;
+}
+.footer-social .social-link svg { width: 1.05rem; height: 1.05rem; }
+.footer-social .social-link:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,.18); filter: brightness(1.05); color: #fff; }
+.footer-social .social-instagram { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
+.footer-social .social-facebook { background: #1877F2; }
+.footer-social .social-x        { background: #000; }
