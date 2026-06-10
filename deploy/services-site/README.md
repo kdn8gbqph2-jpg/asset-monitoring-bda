@@ -4,9 +4,15 @@ Static hub page listing all BDA digital services. Served directly by Nginx — n
 
 ## Files in this folder
 
-- `index.html` — the page (single file)
-- `style.css` — all styles
+- `index.html` — the page (self-contained: SEO meta + JSON-LD structured data, inline SVG icons, no CDN)
+- `style.css` — all styles (Bootstrap is no longer loaded; the few classes used are ported here)
 - `bda-logo.png` — BDA crest / favicon
+- `robots.txt` — allows all crawlers, points to the sitemap
+- `sitemap.xml` — single-URL sitemap (update `<lastmod>` on content changes)
+
+> **SEO note:** the page no longer pulls Bootstrap/icons from jsDelivr (faster, no third-party
+> dependency). After deploying, submit the site in Google Search Console and request indexing —
+> see the SEO checklist handed over in chat. Update `sitemap.xml` `<lastmod>` whenever you edit content.
 
 ## Prerequisites
 
@@ -38,13 +44,17 @@ Certbot will rewrite `nginx-services.conf` in place to add the 443 block and the
 From your dev machine, inside `deploy/services-site/`:
 
 ```bash
-scp -P 2222 index.html style.css bda-logo.png \
+scp -P 2222 index.html style.css bda-logo.png robots.txt sitemap.xml \
     <user>@69.62.80.7:/tmp/services-site/
 
 # Then on the VPS:
 sudo cp /tmp/services-site/* /var/www/services-bdabharatpur/
 sudo chown -R www-data:www-data /var/www/services-bdabharatpur
 ```
+
+`robots.txt` and `sitemap.xml` are served as-is by the existing Nginx `try_files` rule —
+no config change needed. Verify after upload:
+`curl -sI https://services.bdabharatpur.org/robots.txt` and `.../sitemap.xml` should return `200`.
 
 No Nginx reload needed for content changes — just overwrite the files.
 
