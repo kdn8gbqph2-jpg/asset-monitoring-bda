@@ -278,11 +278,40 @@ namespace asset_monitoring.Services
             }
 
             // ── Step 4: Fill remaining time from last change to end of day ───
-            if (currentStatus.HasValue && effectiveDayEndUtc > cursor)
+            // For the CURRENT (still-incomplete) day, the live status entry is the
+            // ground truth — prefer it over the replayed chain status so an unlogged
+            // transition cannot leave the pump accruing phantom time in the wrong
+            // status all the way to "now". For a completed past day the entry says
+            // nothing about that day, so we keep the chain-derived status.
+            var tailStatus = currentStatus;
+            bool isLiveTail = effectiveDayEndUtc < dayEndUtc; // now is before midnight ⇒ today
+            if (isLiveTail && currentEntry != null)
+            {
+                // If we know when the current status began and it falls inside the
+                // tail window, credit the slice before it to the replayed status and
+                // only the slice from then on to the authoritative live status.
+                var liveStartUtc = currentEntry.CurrentStartTime.HasValue
+                    ? DateTime.SpecifyKind(currentEntry.CurrentStartTime.Value, DateTimeKind.Utc)
+                    : (DateTime?)null;
+
+                if (currentStatus.HasValue && liveStartUtc.HasValue
+                    && liveStartUtc.Value > cursor && liveStartUtc.Value < effectiveDayEndUtc)
+                {
+                    var preMinutes = (int)(liveStartUtc.Value - cursor).TotalMinutes;
+                    AccumulateMinutes(currentStatus.Value, preMinutes,
+                        ref onMinutes, ref offMinutes, ref maintenanceMinutes);
+                    cursor = liveStartUtc.Value;
+                }
+
+                tailStatus = currentEntry.Status;
+            }
+
+            if (tailStatus.HasValue && effectiveDayEndUtc > cursor)
             {
                 var minutes = (int)(effectiveDayEndUtc - cursor).TotalMinutes;
-                AccumulateMinutes(currentStatus.Value, minutes,
+                AccumulateMinutes(tailStatus.Value, minutes,
                     ref onMinutes, ref offMinutes, ref maintenanceMinutes);
+                lastStatus = tailStatus;
             }
 
             // If no changes happened, lastStatus = firstStatus

@@ -315,57 +315,57 @@ namespace asset_monitoring.Services
                 {
                     var oldStatus = entry.Status;
 
-                    // Write audit log whenever the status actually changes
+                    // A log row + running-session clock reset happen ONLY on a real
+                    // status change. Idempotent re-submits (oldStatus == newStatus)
+                    // fall through to the metadata updates below WITHOUT touching the
+                    // status timeline.
+                    //
+                    // Duplicate POSTs are already neutralised by (a) the per-pump lock
+                    // above, which serialises concurrent requests, and (b) this equality
+                    // check — once the first request flips entry.Status, any retry sees
+                    // oldStatus == newStatus and writes nothing.
+                    //
+                    // NOTE: a 6-hour "duplicate" guard used to live here. It silently
+                    // DROPPED legitimate rapid toggles (same transition within 6h) while
+                    // still flipping the live status — breaking the log chain (two
+                    // consecutive OFF→ON rows with no ON→OFF between them) and making the
+                    // daily summary replay phantom ON/OFF periods. It was removed because
+                    // the lock + equality check already prevent true duplicates.
                     if (oldStatus != newStatus)
                     {
-                        // Guard against duplicate log entries (e.g. double form submission)
-                        var recentDup = await _db.PumpStatusLogs
-                            .Where(l => l.PumpId == req.PumpId
-                                     && l.OldStatus == oldStatus
-                                     && l.NewStatus == newStatus)
-                            .OrderByDescending(l => l.LogId)
-                            .Select(l => l.EndTime)
-                            .FirstOrDefaultAsync();
-
-                        var isDuplicate = recentDup.HasValue
-                            && (now - recentDup.Value).TotalHours < 6;
-
-                        if (!isDuplicate)
+                        _db.PumpStatusLogs.Add(new PumpStatusLog
                         {
-                            _db.PumpStatusLogs.Add(new PumpStatusLog
-                            {
-                                PumpId               = req.PumpId,
-                                OldStatus            = oldStatus,
-                                NewStatus            = newStatus,
-                                StartTime            = entry.CurrentStartTime,
-                                EndTime              = now,
-                                Remarks              = req.Remarks,
-                                UpdatedBy            = req.UpdatedBy,
-                                RowInsertionDateTime = now,
-                                RowUpdationDateTime  = now
-                            });
+                            PumpId               = req.PumpId,
+                            OldStatus            = oldStatus,
+                            NewStatus            = newStatus,
+                            StartTime            = entry.CurrentStartTime, // when the OLD status began
+                            EndTime              = now,                    // moment of transition
+                            Remarks              = req.Remarks,
+                            UpdatedBy            = req.UpdatedBy,
+                            RowInsertionDateTime = now,
+                            RowUpdationDateTime  = now
+                        });
 
-                            Logger.Info("UpdatePumpDetailsAsync: pumpId={0} status {1}→{2}",
-                                req.PumpId, oldStatus, newStatus);
-                        }
-                        else
+                        Logger.Info("UpdatePumpDetailsAsync: pumpId={0} status {1}→{2}",
+                            req.PumpId, oldStatus, newStatus);
+
+                        // Record end of the ON session when leaving ON.
+                        if (oldStatus == PumpStatus.On)
                         {
-                            Logger.Warn("UpdatePumpDetailsAsync: pumpId={0} skipped duplicate {1}→{2} log (last was {3:s})",
-                                req.PumpId, oldStatus, newStatus, recentDup.Value);
+                            entry.CurrentEndTime = now;
+                            entry.LastRunTime    = now;
                         }
+
+                        // The new status starts now. Advance this ONLY on a real change
+                        // so the NEXT log row's StartTime correctly marks when the new
+                        // status began. (Advancing it on every no-op update opened gaps
+                        // in the chain and distorted durations.)
+                        entry.CurrentStartTime = now;
+                        entry.Status           = newStatus;
                     }
 
-                    // Track running time: record end when leaving ON status
-                    if (newStatus != PumpStatus.On && oldStatus == PumpStatus.On)
-                    {
-                        entry.CurrentEndTime = now;
-                        entry.LastRunTime    = now;
-                    }
-
-                    // Always track when the current status started
-                    entry.CurrentStartTime = now;
-
-                    entry.Status              = newStatus;
+                    // Metadata that may change without a status transition
+                    // (e.g. operator/JE reassignment, remark edit).
                     entry.Remarks             = req.Remarks;
                     entry.UpdatedBy           = req.UpdatedBy;
                     if (req.OperatorMobile != null)
