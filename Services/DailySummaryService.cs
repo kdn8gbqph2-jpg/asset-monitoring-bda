@@ -127,16 +127,18 @@ namespace asset_monitoring.Services
         /// <summary>
         /// Core computation: reconstruct the full timeline for a pump on a given day.
         ///
-        /// Algorithm:
-        ///   1. Determine what status the pump was in at dayStart
-        ///      → Look at the most recent log entry whose EndTime ≤ dayStart; take its NewStatus
-        ///      → If no such log, use the current status from pump_status_tbl (it never changed)
-        ///   2. Collect all "status change events" that happened during the day
-        ///      → A change event happens at EndTime of a log entry (that's when NewStatus takes effect)
-        ///   3. Walk the timeline from dayStart to effectiveDayEnd:
-        ///      → From dayStart to first change: accumulate in the starting status
-        ///      → Between changes: accumulate in the status that was set by the previous change
-        ///      → From last change to dayEnd: accumulate in the final status
+        /// Anchor-based algorithm (robust to a missing/dropped transition row):
+        ///   Each log row carries two independently-trustworthy facts —
+        ///     • at StartTime the pump was in OldStatus (start of that interval)
+        ///     • at EndTime   the pump became NewStatus (the transition)
+        ///   plus the live entry gives the open, not-yet-closed interval
+        ///     • at CurrentStartTime the pump is in entry.Status (until "now").
+        ///   These become (time, status) anchors; the status between one anchor and
+        ///   the next is the earlier anchor's status. Because a surviving row's
+        ///   OldStatus anchor still injects the correct status for its own interval,
+        ///   a dropped ON→OFF row no longer makes the day replay a phantom ON period
+        ///   (the previous algorithm used only NewStatus/EndTime and propagated the
+        ///   wrong status across the gap).
         /// </summary>
         private PumpDailySummary ComputeDaySummary(
             int pumpId,
@@ -177,146 +179,96 @@ namespace asset_monitoring.Services
                 };
             }
 
-            // ── Step 1: Determine starting status at dayStart ────────────────
-            // We check BOTH completed logs and ongoing sessions, then pick whichever
-            // represents the most recent transition before the day started.
+            // ── Build (time, status) anchors from every surviving fact ───────
+            // Anchors are inserted row-by-row (Start, then End) and finally the open
+            // live interval. OrderBy is stable, so when two anchors share a timestamp
+            // the later-inserted one wins — which lets the authoritative live status
+            // take precedence over a stale chain tail.
+            var anchors = new List<(DateTime Time, PumpStatus Status)>();
+            foreach (var l in allPumpLogs)
+            {
+                if (l.StartTime.HasValue && l.OldStatus.HasValue)
+                    anchors.Add((DateTime.SpecifyKind(l.StartTime.Value, DateTimeKind.Utc), l.OldStatus.Value));
 
-            // a) Most recent completed log before day start (transition at EndTime)
-            //    Tiebreakers: RowInsertionDateTime, then StartTime (in a chain of
-            //    transitions, each log's StartTime = previous log's EndTime, so the
-            //    log with the latest StartTime is the most recent transition).
-            var lastCompletedLog = allPumpLogs
-                .Where(l => l.EndTime.HasValue && l.EndTime.Value <= dayStartUtc)
-                .OrderByDescending(l => l.EndTime)
-                .ThenByDescending(l => l.RowInsertionDateTime)
-                .ThenByDescending(l => l.StartTime)
-                .FirstOrDefault();
+                if (l.EndTime.HasValue)
+                    anchors.Add((DateTime.SpecifyKind(l.EndTime.Value, DateTimeKind.Utc), l.NewStatus));
+                else
+                    // Legacy ongoing log (no EndTime): the transition to NewStatus was
+                    // recorded at RowInsertionDateTime.
+                    anchors.Add((DateTime.SpecifyKind(l.RowInsertionDateTime, DateTimeKind.Utc), l.NewStatus));
+            }
 
-            // b) Most recent ongoing log (EndTime=NULL) created before day start
-            //    These are status changes where EndTime was not recorded (e.g. legacy bug).
-            //    The transition happened at RowInsertionDateTime.
-            var lastOngoingLog = allPumpLogs
-                .Where(l => !l.EndTime.HasValue && l.RowInsertionDateTime <= dayStartUtc)
-                .OrderByDescending(l => l.RowInsertionDateTime)
-                .FirstOrDefault();
+            if (currentEntry?.CurrentStartTime != null)
+                anchors.Add((DateTime.SpecifyKind(currentEntry.CurrentStartTime.Value, DateTimeKind.Utc),
+                             currentEntry.Status));
 
+            anchors = anchors.OrderBy(a => a.Time).ToList(); // stable on ties
+
+            // ── Status at dayStart = latest anchor at or before dayStart ─────
             PumpStatus? statusAtDayStart = null;
-
-            if (lastCompletedLog != null && lastOngoingLog != null)
+            int firstAnchorInDay = anchors.Count; // first anchor strictly after dayStart
+            for (int i = 0; i < anchors.Count; i++)
             {
-                // Pick the later transition: completed log transitioned at EndTime,
-                // ongoing log transitioned at RowInsertionDateTime.
-                // Use >= so that ongoing logs win ties (they represent the later state).
-                statusAtDayStart = lastOngoingLog.RowInsertionDateTime >= lastCompletedLog.EndTime!.Value
-                    ? lastOngoingLog.NewStatus
-                    : lastCompletedLog.NewStatus;
-            }
-            else if (lastCompletedLog != null)
-            {
-                statusAtDayStart = lastCompletedLog.NewStatus;
-            }
-            else if (lastOngoingLog != null)
-            {
-                statusAtDayStart = lastOngoingLog.NewStatus;
-            }
-            // else: resolved below after collecting changesInDay
-
-            // ── Step 2: Collect status change events within the day ───────────
-            // A "change event" = a log entry whose EndTime falls within [dayStart, dayEnd)
-            // At EndTime, the pump transitions from OldStatus → NewStatus
-            var changesInDay = allPumpLogs
-                .Where(l => l.EndTime.HasValue
-                         && l.EndTime.Value > dayStartUtc
-                         && l.EndTime.Value < dayEndUtc)
-                .OrderBy(l => l.EndTime)
-                .ToList();
-
-            // If no pre-day logs found, infer starting status from the first change in the day
-            // (its OldStatus tells us what the pump was in at day start)
-            if (statusAtDayStart == null && changesInDay.Count > 0)
-            {
-                statusAtDayStart = changesInDay[0].OldStatus ?? PumpStatus.Off;
-            }
-            else if (statusAtDayStart == null && currentEntry != null)
-            {
-                // No logs at all — pump never changed status, use current status
-                statusAtDayStart = currentEntry.Status;
-            }
-
-            // Also check for sessions that STARTED during the day but have no EndTime
-            // (pump turned ON during the day and is still running)
-            // These are captured by log entries where:
-            //   - OldStatus changed to NewStatus
-            //   - The change happened (EndTime) during the day... but wait,
-            //     if there's no EndTime, the OLD status session is still active.
-            // Actually, log entries with no EndTime mean the OLD status session hasn't ended yet.
-            // So we check: is there an ongoing log (no EndTime) whose StartTime < dayEnd?
-            // If so, the OldStatus was active from StartTime through the day.
-
-            // ── Step 3: Walk the timeline ────────────────────────────────────
-            var cursor = dayStartUtc;
-            var currentStatus = statusAtDayStart;
-            firstStatus = currentStatus;
-
-            foreach (var change in changesInDay)
-            {
-                var changeTime = change.EndTime!.Value;
-
-                // Accumulate time from cursor to changeTime in currentStatus
-                if (currentStatus.HasValue && changeTime > cursor)
+                if (anchors[i].Time <= dayStartUtc)
                 {
-                    var minutes = (int)(changeTime - cursor).TotalMinutes;
-                    AccumulateMinutes(currentStatus.Value, minutes,
+                    statusAtDayStart = anchors[i].Status;
+                }
+                else
+                {
+                    firstAnchorInDay = i;
+                    break;
+                }
+            }
+
+            // Fallbacks when nothing is known before dayStart.
+            if (statusAtDayStart == null)
+                statusAtDayStart = anchors.Count > 0
+                    ? anchors[0].Status                       // earliest known status
+                    : (currentEntry?.Status ?? PumpStatus.Off);
+
+            // ── Walk the day, accumulating minutes per status ────────────────
+            // Each segment's minutes are computed as the difference of rounded
+            // minute-offsets from dayStart. This telescopes exactly to the day's
+            // total length (no per-segment truncation drift), so on+off+maint always
+            // sums to the full day and the completeness check never falsely flags it.
+            var cursor        = dayStartUtc;
+            int accountedMin  = 0;
+            var currentStatus = statusAtDayStart.Value;
+            firstStatus       = currentStatus;
+            lastStatus        = currentStatus;
+
+            int PosOf(DateTime t) =>
+                (int)Math.Round((t - dayStartUtc).TotalMinutes, MidpointRounding.AwayFromZero);
+
+            for (int i = firstAnchorInDay; i < anchors.Count; i++)
+            {
+                var (time, status) = anchors[i];
+                if (time >= effectiveDayEndUtc) break;
+
+                if (time > cursor)
+                {
+                    int pos = PosOf(time);
+                    AccumulateMinutes(currentStatus, pos - accountedMin,
                         ref onMinutes, ref offMinutes, ref maintenanceMinutes);
+                    accountedMin = pos;
+                    cursor = time;
                 }
 
-                // Transition to new status
-                currentStatus = change.NewStatus;
-                lastStatus = change.NewStatus;
-                cursor = changeTime;
-                statusChangeCount++;
-            }
-
-            // ── Step 4: Fill remaining time from last change to end of day ───
-            // For the CURRENT (still-incomplete) day, the live status entry is the
-            // ground truth — prefer it over the replayed chain status so an unlogged
-            // transition cannot leave the pump accruing phantom time in the wrong
-            // status all the way to "now". For a completed past day the entry says
-            // nothing about that day, so we keep the chain-derived status.
-            var tailStatus = currentStatus;
-            bool isLiveTail = effectiveDayEndUtc < dayEndUtc; // now is before midnight ⇒ today
-            if (isLiveTail && currentEntry != null)
-            {
-                // If we know when the current status began and it falls inside the
-                // tail window, credit the slice before it to the replayed status and
-                // only the slice from then on to the authoritative live status.
-                var liveStartUtc = currentEntry.CurrentStartTime.HasValue
-                    ? DateTime.SpecifyKind(currentEntry.CurrentStartTime.Value, DateTimeKind.Utc)
-                    : (DateTime?)null;
-
-                if (currentStatus.HasValue && liveStartUtc.HasValue
-                    && liveStartUtc.Value > cursor && liveStartUtc.Value < effectiveDayEndUtc)
+                if (status != currentStatus)
                 {
-                    var preMinutes = (int)(liveStartUtc.Value - cursor).TotalMinutes;
-                    AccumulateMinutes(currentStatus.Value, preMinutes,
-                        ref onMinutes, ref offMinutes, ref maintenanceMinutes);
-                    cursor = liveStartUtc.Value;
+                    statusChangeCount++;
+                    currentStatus = status;
+                    lastStatus    = status;
                 }
-
-                tailStatus = currentEntry.Status;
             }
 
-            if (tailStatus.HasValue && effectiveDayEndUtc > cursor)
+            // Remaining time from the last anchor to the end of the (effective) day.
+            if (effectiveDayEndUtc > cursor)
             {
-                var minutes = (int)(effectiveDayEndUtc - cursor).TotalMinutes;
-                AccumulateMinutes(tailStatus.Value, minutes,
+                int pos = PosOf(effectiveDayEndUtc);
+                AccumulateMinutes(currentStatus, pos - accountedMin,
                     ref onMinutes, ref offMinutes, ref maintenanceMinutes);
-                lastStatus = tailStatus;
             }
-
-            // If no changes happened, lastStatus = firstStatus
-            if (lastStatus == null)
-                lastStatus = firstStatus;
 
             return new PumpDailySummary
             {
