@@ -195,7 +195,7 @@ namespace asset_monitoring.Services
                         _                      => "OFF"
                     },
                     RunningMinutes  = r.EntryStatus == PumpStatus.On && r.CurrentStartTime.HasValue
-                        ? (int)(DateTime.UtcNow - r.CurrentStartTime.Value).TotalMinutes
+                        ? Math.Max(0, (int)(DateTime.UtcNow - r.CurrentStartTime.Value).TotalMinutes)
                         : 0,
                     LastUpdated     = AsUtc(r.LastUpdated),
                     OperatorMobile  = r.OperatorMobile,

@@ -23,7 +23,7 @@ namespace asset_monitoring.Services
             Logger.Info("ExportPumpsAsCsv: generating CSV for {0} pumps", pumps.Count);
 
             var sb = new StringBuilder();
-            sb.AppendLine("PumpId,VendorName,Location,OperatorName,OperatorMobile,JEName,JEMobile,Status,RunningMinutes,LastUpdated");
+            sb.AppendLine("PumpId,VendorName,Location,OperatorName,OperatorMobile,JEName,JEMobile,Status,CurrentRunMinutes,LastUpdated");
             foreach (var p in pumps)
             {
                 sb.AppendLine($"{CsvEscape(p.PumpId)},{CsvEscape(p.VendorName)},{CsvEscape(p.Location)},{CsvEscape(p.OperatorName)},{CsvEscape(p.OperatorMobile)},{CsvEscape(p.JeName)},{CsvEscape(p.JeMobile)},{CsvEscape(p.Status)},{p.RunningMinutes},{p.LastUpdated:yyyy-MM-dd HH:mm:ss}");
@@ -45,7 +45,7 @@ namespace asset_monitoring.Services
             var ws = wb.Worksheets.Add("Pump Report");
 
             string[] headers = { "Pump ID", "Vendor", "Location", "Operator Name", "Operator Mobile",
-                                  "JE Name", "JE Mobile", "Status", "Running (min)", "Last Updated" };
+                                  "JE Name", "JE Mobile", "Status", "Current Run (min)", "Last Updated" };
             for (int i = 0; i < headers.Length; i++)
             {
                 var cell = ws.Cell(1, i + 1);
@@ -141,7 +141,7 @@ namespace asset_monitoring.Services
                             c.Background(Colors.Blue.Darken2).Padding(4).AlignCenter();
 
                         string[] heads = { "ID", "Vendor", "Location", "Operator", "Op. Mobile",
-                                           "JE Name", "JE Mobile", "Status", "Running" };
+                                           "JE Name", "JE Mobile", "Status", "Current Run" };
                         table.Header(header =>
                         {
                             foreach (var h in heads)

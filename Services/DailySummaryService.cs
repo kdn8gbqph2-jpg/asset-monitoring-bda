@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using asset_monitoring.Data;
 using asset_monitoring.Models;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,12 @@ namespace asset_monitoring.Services
 
         private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById(
             OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
+
+        // Serializes summary rebuilds per IST date so concurrent builders (the
+        // 5-min loop, the post-write fire-and-forget refresh, and startup backfill)
+        // cannot interleave their delete+insert upsert and trip the
+        // (pump_id, summary_date) unique key.
+        private static readonly ConcurrentDictionary<DateTime, SemaphoreSlim> _dateLocks = new();
 
         public DailySummaryService(IServiceScopeFactory scopeFactory)
         {
@@ -107,19 +114,33 @@ namespace asset_monitoring.Services
                 summaries.Add(summary);
             }
 
-            // Upsert: delete existing rows for this date, then insert fresh
-            var existingRows = await db.PumpDailySummaries
-                .Where(s => s.SummaryDate == date && pumpIds.Contains(s.PumpId))
-                .ToListAsync();
-
-            if (existingRows.Any())
+            // Upsert under a per-date lock: delete existing rows for this date,
+            // then insert fresh. The lock prevents a concurrent rebuild of the
+            // same date from interleaving its delete+insert (which would either
+            // trip the (pump_id, summary_date) unique key or delete the other
+            // run's freshly inserted rows). Last writer wins, which is correct —
+            // both runs reconstruct from the same logs.
+            var gate = _dateLocks.GetOrAdd(date, _ => new SemaphoreSlim(1, 1));
+            await gate.WaitAsync();
+            try
             {
-                db.PumpDailySummaries.RemoveRange(existingRows);
+                var existingRows = await db.PumpDailySummaries
+                    .Where(s => s.SummaryDate == date && pumpIds.Contains(s.PumpId))
+                    .ToListAsync();
+
+                if (existingRows.Any())
+                {
+                    db.PumpDailySummaries.RemoveRange(existingRows);
+                    await db.SaveChangesAsync();
+                }
+
+                db.PumpDailySummaries.AddRange(summaries);
                 await db.SaveChangesAsync();
             }
-
-            db.PumpDailySummaries.AddRange(summaries);
-            await db.SaveChangesAsync();
+            finally
+            {
+                gate.Release();
+            }
 
             Logger.Info("BuildSummaryForDateAsync: upserted {0} summaries for {1:yyyy-MM-dd}", summaries.Count, date);
         }

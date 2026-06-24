@@ -26,7 +26,10 @@ try
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
+               // Force every connection's session TZ to UTC so CURRENT_TIMESTAMP
+               // defaults match the app's UtcNow writes (running-hours math assumes UTC).
+               .AddInterceptors(new asset_monitoring.Data.UtcSessionTimeZoneInterceptor()));
 
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<UserCacheService>();
