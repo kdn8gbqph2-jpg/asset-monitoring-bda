@@ -124,6 +124,12 @@ namespace asset_monitoring.Services
             await gate.WaitAsync();
             try
             {
+                // Atomic: delete + insert run in one transaction so a failure (or a
+                // crash/connection drop) between them can't leave the day with the
+                // old rows deleted but the new rows not yet written — which would
+                // silently report 0 running minutes until the next rebuild.
+                await using var tx = await db.Database.BeginTransactionAsync();
+
                 var existingRows = await db.PumpDailySummaries
                     .Where(s => s.SummaryDate == date && pumpIds.Contains(s.PumpId))
                     .ToListAsync();
@@ -136,6 +142,8 @@ namespace asset_monitoring.Services
 
                 db.PumpDailySummaries.AddRange(summaries);
                 await db.SaveChangesAsync();
+
+                await tx.CommitAsync();
             }
             finally
             {
@@ -241,11 +249,14 @@ namespace asset_monitoring.Services
                 }
             }
 
-            // Fallbacks when nothing is known before dayStart.
+            // Fallbacks when nothing is known before dayStart. A live ON/MAINTENANCE
+            // status is only trusted when CurrentStartTime is set — otherwise the
+            // entry is treated as OFF, so a corrupt (Status=ON, CurrentStartTime=NULL)
+            // row can't credit a phantom full day of running.
             if (statusAtDayStart == null)
                 statusAtDayStart = anchors.Count > 0
                     ? anchors[0].Status                       // earliest known status
-                    : (currentEntry?.Status ?? PumpStatus.Off);
+                    : (currentEntry?.CurrentStartTime != null ? currentEntry.Status : PumpStatus.Off);
 
             // ── Walk the day, accumulating minutes per status ────────────────
             // Each segment's minutes are computed as the difference of rounded
@@ -347,7 +358,10 @@ namespace asset_monitoring.Services
             catch (Exception ex)
             {
                 Logger.Error(ex, "HasIncompleteSummaryAsync failed for date={0:yyyy-MM-dd}", date);
-                return false; // Don't retry on error — will be caught next startup
+                // Treat as incomplete on error: rebuilding an already-complete day is
+                // cheap and idempotent, whereas skipping a possibly-broken day loses
+                // running-hours data silently.
+                return true;
             }
         }
 

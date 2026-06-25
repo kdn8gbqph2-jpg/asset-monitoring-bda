@@ -58,17 +58,19 @@ namespace asset_monitoring.Services
         /// </summary>
         private async Task BackfillIncompleteDays(CancellationToken ct)
         {
-            try
+            var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Ist);
+            var today = nowIst.Date;
+
+            // Check last 30 days (excluding today — today is always partial). Each
+            // date is guarded independently so one date failing to build cannot abort
+            // the backfill of the remaining days (which would leave silent gaps).
+            for (int i = 1; i <= 30; i++)
             {
-                var nowIst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Ist);
-                var today = nowIst.Date;
+                if (ct.IsCancellationRequested) return;
 
-                // Check last 30 days (excluding today — today is always partial)
-                for (int i = 1; i <= 30; i++)
+                var date = today.AddDays(-i);
+                try
                 {
-                    if (ct.IsCancellationRequested) return;
-
-                    var date = today.AddDays(-i);
                     var isIncomplete = await _summaryService.HasIncompleteSummaryAsync(date);
                     if (isIncomplete)
                     {
@@ -76,10 +78,11 @@ namespace asset_monitoring.Services
                         await _summaryService.BuildSummaryForDateAsync(date);
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "BackfillIncompleteDays failed");
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "BackfillIncompleteDays: failed for {0}, continuing with remaining days",
+                        date.ToString("yyyy-MM-dd"));
+                }
             }
         }
 

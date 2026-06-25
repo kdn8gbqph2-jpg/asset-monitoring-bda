@@ -221,20 +221,67 @@ namespace asset_monitoring.Services
         {
             Logger.Info("DeletePumpAsync: pumpId={0}", pumpId);
 
-            var pump = await _db.BdaPumpMasters.FindAsync(pumpId);
-            if (pump == null)
+            // Serialize with status updates for this pump so closing the open session
+            // can't race a concurrent UpdatePumpDetailsAsync.
+            var pumpLock = PumpLocks.GetOrAdd(pumpId, _ => new SemaphoreSlim(1, 1));
+            await pumpLock.WaitAsync();
+            try
             {
-                Logger.Warn("DeletePumpAsync: pumpId={0} not found", pumpId);
-                return false;
+                var pump = await _db.BdaPumpMasters.FindAsync(pumpId);
+                if (pump == null)
+                {
+                    Logger.Warn("DeletePumpAsync: pumpId={0} not found", pumpId);
+                    return false;
+                }
+
+                var now = DateTime.UtcNow;
+
+                // Close any open ON/MAINTENANCE session BEFORE deactivating. Otherwise
+                // the still-open interval (entry.Status + CurrentStartTime) survives the
+                // soft-delete and, if the pump is later reactivated without a status
+                // change, gets replayed as phantom running time from that stale start.
+                var entry = await _db.PumpStatusEntries.FindAsync(pumpId);
+                if (entry != null && entry.Status != PumpStatus.Off)
+                {
+                    var closing = entry.Status;
+                    _db.PumpStatusLogs.Add(new PumpStatusLog
+                    {
+                        PumpId               = pumpId,
+                        OldStatus            = closing,
+                        NewStatus            = PumpStatus.Off,
+                        StartTime            = entry.CurrentStartTime,
+                        EndTime              = now,
+                        Remarks              = "Auto-closed on pump deactivation",
+                        UpdatedBy            = pump.UpdatedBy,
+                        RowInsertionDateTime = now,
+                        RowUpdationDateTime  = now
+                    });
+
+                    if (closing == PumpStatus.On)
+                    {
+                        entry.CurrentEndTime = now;
+                        entry.LastRunTime    = now;
+                    }
+                    entry.Status              = PumpStatus.Off;
+                    entry.CurrentStartTime    = now;
+                    entry.RowActionCount     += 1;
+                    entry.RowUpdationDateTime  = now;
+
+                    Logger.Info("DeletePumpAsync: closed open {0} session for pumpId={1}", closing, pumpId);
+                }
+
+                pump.IsActive            = false;
+                pump.RowUpdationDateTime  = now;
+                await _db.SaveChangesAsync();
+
+                _cache.Remove(ADMIN_CACHE_KEY);
+                Logger.Info("DeletePumpAsync: pumpId={0} deactivated, cache cleared", pumpId);
+                return true;
             }
-
-            pump.IsActive            = false;
-            pump.RowUpdationDateTime = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-
-            _cache.Remove(ADMIN_CACHE_KEY);
-            Logger.Info("DeletePumpAsync: pumpId={0} deactivated, cache cleared", pumpId);
-            return true;
+            finally
+            {
+                pumpLock.Release();
+            }
         }
 
         // ── Update pump details (replaces sp_update_pump_details) ─────────────
@@ -257,6 +304,7 @@ namespace asset_monitoring.Services
                     Logger.Warn("UpdatePumpDetailsAsync: pumpId={0} not found", req.PumpId);
                     return;
                 }
+                var wasActive = pump.IsActive; // for reactivation detection below
                 pump.VendorName          = req.VendorName;
                 pump.Category            = req.Category;
                 pump.IsActive            = req.IsActive;
@@ -374,6 +422,12 @@ namespace asset_monitoring.Services
                         entry.JeMobile        = string.IsNullOrEmpty(req.JeMobile) ? null : req.JeMobile;
                     entry.RowActionCount     += 1;
                     entry.RowUpdationDateTime = now;
+
+                    // Reactivation: a pump just re-enabled (was inactive) starts a
+                    // fresh status clock so any stale open interval left from when it
+                    // was deactivated can't be replayed as phantom running time.
+                    if (!wasActive && req.IsActive)
+                        entry.CurrentStartTime = now;
                 }
 
                 await _db.SaveChangesAsync();
