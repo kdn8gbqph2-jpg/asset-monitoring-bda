@@ -19,6 +19,7 @@ namespace asset_monitoring.Data
         public DbSet<PumpDailySummary> PumpDailySummaries { get; set; } = null!;
         public DbSet<ComplaintLog> ComplaintLogs { get; set; } = null!;
         public DbSet<AppConfig> AppConfigs { get; set; } = null!;
+        public DbSet<PushSubscription> PushSubscriptions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -30,6 +31,7 @@ namespace asset_monitoring.Data
             modelBuilder.ApplyConfiguration(new PumpDailySummaryConfig());
             modelBuilder.ApplyConfiguration(new ComplaintLogConfig());
             modelBuilder.ApplyConfiguration(new AppConfigConfig());
+            modelBuilder.ApplyConfiguration(new PushSubscriptionConfig());
 
             base.OnModelCreating(modelBuilder);
         }

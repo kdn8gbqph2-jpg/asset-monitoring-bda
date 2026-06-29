@@ -250,6 +250,24 @@ namespace asset_monitoring.Pages
                 Logger.Info("Complaint #{0} saved for pumpId={1}, photo={2}",
                     complaint.ComplaintId, input.PumpId, photoPath ?? "(none)");
 
+                // Push-notify the assigned JE (best-effort, fire-and-forget so it
+                // never blocks or fails the complaint submission / WhatsApp flow).
+                if (!string.IsNullOrWhiteSpace(input.JeMobile))
+                {
+                    var push = HttpContext.RequestServices.GetService<PushNotificationService>();
+                    if (push != null && push.IsConfigured)
+                    {
+                        var jeMobile = input.JeMobile;
+                        var pumpId   = input.PumpId;
+                        var location = input.Location;
+                        var actual   = input.ActualStatus;
+                        _ = Task.Run(() => push.SendToMobileAsync(jeMobile,
+                            "New pump complaint",
+                            $"Pump {pumpId} ({location}): {actual}",
+                            "/JuniorEngineer"));
+                    }
+                }
+
                 // Build WhatsApp URL from app config
                 var whatsappUrl = await BuildWhatsAppUrl(input);
                 var photoUrl = photoPath != null ? $"/{photoPath}" : null;

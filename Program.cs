@@ -36,6 +36,7 @@ try
     builder.Services.AddScoped<PumpDashboardService>();
     builder.Services.AddScoped<ReportExportService>();
     builder.Services.AddSingleton<DailySummaryService>();
+    builder.Services.AddSingleton<PushNotificationService>();
     builder.Services.AddHostedService<DailySummaryBackgroundService>();
 
     builder.Services.AddSession(options =>
@@ -90,7 +91,18 @@ try
         app.UseHttpsRedirection();
     }
 
-    app.UseStaticFiles();
+    var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+    contentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json";
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        ContentTypeProvider = contentTypeProvider,
+        OnPrepareResponse = ctx =>
+        {
+            // The service worker must never be cached, so SW updates ship immediately.
+            if (ctx.File.Name.Equals("sw.js", StringComparison.OrdinalIgnoreCase))
+                ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+        }
+    });
     app.UseRouting();
     app.UseSession();
     app.UseAuthorization();
