@@ -95,6 +95,20 @@ namespace asset_monitoring.Pages
             return new JsonResult(new { success = true });
         }
 
+        // Sends a test push to the CURRENT logged-in user's own devices — for
+        // verifying delivery end-to-end (call window.bdaTestPush() in the console).
+        public async Task<JsonResult> OnPostSendTestAsync()
+        {
+            if (!IsLoggedIn || UserId is null)
+                return new JsonResult(new { success = false, message = "Not logged in" }) { StatusCode = 401 };
+            if (!_push.IsConfigured)
+                return new JsonResult(new { success = false, message = "Push not configured (no VAPID keys)." });
+
+            await _push.SendToUserAsync(UserId.Value, "BDA PMS test",
+                "Push notifications are working ✅", "/Dashboard");
+            return new JsonResult(new { success = true });
+        }
+
         public class BrowserSubscription
         {
             public string Endpoint { get; set; } = "";

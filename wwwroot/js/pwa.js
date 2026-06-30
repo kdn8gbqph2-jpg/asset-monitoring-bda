@@ -46,6 +46,14 @@
     return out;
   }
 
+  // Console helper for testing: send a push to your own devices.
+  window.bdaTestPush = function () {
+    return fetch('/Push?handler=SendTest', {
+      method: 'POST',
+      headers: { 'RequestVerificationToken': requestToken() }
+    }).then(function (r) { return r.json(); }).then(function (d) { console.log('bdaTestPush:', d); return d; });
+  };
+
   // ── Push ────────────────────────────────────────────────────────────────
   function initPush(reg) {
     if (!('PushManager' in window) || !('Notification' in window) || !isLoggedIn()) return;
