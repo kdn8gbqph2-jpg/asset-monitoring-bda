@@ -62,6 +62,7 @@ namespace asset_monitoring.Services
         private readonly ApplicationDbContext _db;
         private readonly IMemoryCache _cache;
         private readonly DailySummaryService _dailySummary;
+        private readonly PushNotificationService _push;
 
         private const string ADMIN_CACHE_KEY = "PUMP_DASHBOARD_ADMIN";
 
@@ -75,11 +76,13 @@ namespace asset_monitoring.Services
         private static DateTime AsUtc(DateTime dt)
             => DateTime.SpecifyKind(dt, DateTimeKind.Utc);
 
-        public PumpDashboardService(ApplicationDbContext db, IMemoryCache cache, DailySummaryService dailySummary)
+        public PumpDashboardService(ApplicationDbContext db, IMemoryCache cache,
+            DailySummaryService dailySummary, PushNotificationService push)
         {
             _db = db;
             _cache = cache;
             _dailySummary = dailySummary;
+            _push = push;
         }
 
         // ── Force-invalidate the ADMIN pump cache ─────────────────────────────
@@ -119,9 +122,16 @@ namespace asset_monitoring.Services
             return await FetchFromDatabaseAsync(userId, user_type);
         }
 
+        // ── Admin inventory: ALL pumps incl. deactivated (uncached) ───────────
+        // The dashboard/operator/JE views only ever see active pumps (GetPumpsAsync
+        // filters IsActive). The admin Pump Inventory uses this so deactivated pumps
+        // stay listed and can be re-activated.
+        public Task<List<DashboardPumpDto>> GetAllPumpsAsync()
+            => FetchFromDatabaseAsync(null, "ADMIN", includeInactive: true);
+
         // ── Core EF Core LINQ query (replaces sp_get_pump_dashboard_data) ─────
         private async Task<List<DashboardPumpDto>> FetchFromDatabaseAsync(
-            int? userId, string? user_type)
+            int? userId, string? user_type, bool includeInactive = false)
         {
             try
             {
@@ -157,7 +167,7 @@ namespace asset_monitoring.Services
                 // Join pump master → location (left) → status entry (left)
                 var rawData = await (
                     from pump in _db.BdaPumpMasters
-                    where pump.IsActive
+                    where includeInactive || pump.IsActive
                     join loc   in _db.BdaPumpLocations   on pump.PumpId equals loc.PumpId   into locGroup
                     from loc   in locGroup.DefaultIfEmpty()
                     join entry in _db.PumpStatusEntries  on pump.PumpId equals entry.PumpId into entryGroup
@@ -169,6 +179,7 @@ namespace asset_monitoring.Services
                     {
                         pump.PumpId,
                         pump.VendorName,
+                        pump.IsActive,
                         LocationName     = loc   != null ? loc.LocationName          : null,
                         Latitude         = loc   != null ? loc.Latitude              : (decimal?)null,
                         Longitude        = loc   != null ? loc.Longitude             : (decimal?)null,
@@ -202,6 +213,7 @@ namespace asset_monitoring.Services
                     OperatorName    = r.OperatorMobile != null && userMap.TryGetValue(r.OperatorMobile, out var opN) ? opN : null,
                     JeMobile        = r.JeMobile,
                     JeName          = r.JeMobile != null && userMap.TryGetValue(r.JeMobile, out var jeN) ? jeN : null,
+                    IsActive        = r.IsActive,
                 }).ToList();
 
                 Logger.Debug("FetchFromDatabaseAsync: {0} pumps for userId={1}, userType={2}",
@@ -216,13 +228,20 @@ namespace asset_monitoring.Services
             }
         }
 
-        // ── Soft-delete pump + clear cache ────────────────────────────────────
-        public async Task<bool> DeletePumpAsync(int pumpId)
-        {
-            Logger.Info("DeletePumpAsync: pumpId={0}", pumpId);
+        // ── Deactivate (soft-delete) — kept for existing callers ──────────────
+        public Task<bool> DeletePumpAsync(int pumpId) => SetPumpActiveAsync(pumpId, false);
 
-            // Serialize with status updates for this pump so closing the open session
-            // can't race a concurrent UpdatePumpDetailsAsync.
+        // ── Activate / deactivate a pump ──────────────────────────────────────
+        // Deactivated pumps drop off the dashboard (which filters IsActive) but
+        // stay in the admin inventory so they can be re-activated. Deactivating
+        // closes any open ON/MAINTENANCE session; activating resets the status
+        // clock so no stale open interval replays as phantom running time.
+        public async Task<bool> SetPumpActiveAsync(int pumpId, bool active)
+        {
+            Logger.Info("SetPumpActiveAsync: pumpId={0}, active={1}", pumpId, active);
+
+            // Serialize with status updates for this pump so closing/reopening the
+            // session can't race a concurrent UpdatePumpDetailsAsync.
             var pumpLock = PumpLocks.GetOrAdd(pumpId, _ => new SemaphoreSlim(1, 1));
             await pumpLock.WaitAsync();
             try
@@ -230,19 +249,17 @@ namespace asset_monitoring.Services
                 var pump = await _db.BdaPumpMasters.FindAsync(pumpId);
                 if (pump == null)
                 {
-                    Logger.Warn("DeletePumpAsync: pumpId={0} not found", pumpId);
+                    Logger.Warn("SetPumpActiveAsync: pumpId={0} not found", pumpId);
                     return false;
                 }
 
-                var now = DateTime.UtcNow;
-
-                // Close any open ON/MAINTENANCE session BEFORE deactivating. Otherwise
-                // the still-open interval (entry.Status + CurrentStartTime) survives the
-                // soft-delete and, if the pump is later reactivated without a status
-                // change, gets replayed as phantom running time from that stale start.
+                var now   = DateTime.UtcNow;
                 var entry = await _db.PumpStatusEntries.FindAsync(pumpId);
-                if (entry != null && entry.Status != PumpStatus.Off)
+
+                if (!active && entry != null && entry.Status != PumpStatus.Off)
                 {
+                    // Deactivating with an open ON/MAINTENANCE session: close it so the
+                    // still-open interval isn't replayed as phantom running time.
                     var closing = entry.Status;
                     _db.PumpStatusLogs.Add(new PumpStatusLog
                     {
@@ -266,16 +283,22 @@ namespace asset_monitoring.Services
                     entry.CurrentStartTime    = now;
                     entry.RowActionCount     += 1;
                     entry.RowUpdationDateTime  = now;
-
-                    Logger.Info("DeletePumpAsync: closed open {0} session for pumpId={1}", closing, pumpId);
+                    Logger.Info("SetPumpActiveAsync: closed open {0} session for pumpId={1}", closing, pumpId);
+                }
+                else if (active && entry != null)
+                {
+                    // Reactivating: restart the status clock so any stale open interval
+                    // left from before deactivation can't be replayed.
+                    entry.CurrentStartTime   = now;
+                    entry.RowUpdationDateTime = now;
                 }
 
-                pump.IsActive            = false;
+                pump.IsActive            = active;
                 pump.RowUpdationDateTime  = now;
                 await _db.SaveChangesAsync();
 
                 _cache.Remove(ADMIN_CACHE_KEY);
-                Logger.Info("DeletePumpAsync: pumpId={0} deactivated, cache cleared", pumpId);
+                Logger.Info("SetPumpActiveAsync: pumpId={0} set active={1}, cache cleared", pumpId, active);
                 return true;
             }
             finally
@@ -342,6 +365,11 @@ namespace asset_monitoring.Services
                     _             => PumpStatus.Off
                 };
 
+                // Track a real status change so we can push-notify the assigned
+                // operator + JE once the change is committed.
+                bool statusChanged   = false;
+                PumpStatus fromStatus = PumpStatus.Off;
+
                 var entry = await _db.PumpStatusEntries.FindAsync(req.PumpId);
                 if (entry == null)
                 {
@@ -397,6 +425,9 @@ namespace asset_monitoring.Services
                         Logger.Info("UpdatePumpDetailsAsync: pumpId={0} status {1}→{2}",
                             req.PumpId, oldStatus, newStatus);
 
+                        statusChanged = true;
+                        fromStatus    = oldStatus;
+
                         // Record end of the ON session when leaving ON.
                         if (oldStatus == PumpStatus.On)
                         {
@@ -433,6 +464,20 @@ namespace asset_monitoring.Services
                 await _db.SaveChangesAsync();
                 _cache.Remove(ADMIN_CACHE_KEY);
                 Logger.Info("UpdatePumpDetailsAsync: pumpId={0} updated via EF Core", req.PumpId);
+
+                // Push-notify the assigned operator + JE on a real status change
+                // (best-effort, fire-and-forget; never blocks the update).
+                if (statusChanged && entry != null && _push.IsConfigured)
+                {
+                    var opMobile = entry.OperatorMobile;
+                    var jeMobile = entry.JeMobile;
+                    var title    = "Pump status changed";
+                    var body     = $"Pump {req.PumpId}: {StatusLabel(fromStatus)} → {StatusLabel(entry.Status)}";
+                    if (!string.IsNullOrWhiteSpace(opMobile))
+                        _ = Task.Run(() => _push.SendToMobileAsync(opMobile!, title, body, "/Operator"));
+                    if (!string.IsNullOrWhiteSpace(jeMobile) && jeMobile != opMobile)
+                        _ = Task.Run(() => _push.SendToMobileAsync(jeMobile!, title, body, "/JuniorEngineer"));
+                }
 
                 // Refresh today's daily summary in the background (fire-and-forget)
                 _ = Task.Run(async () =>
@@ -794,6 +839,7 @@ namespace asset_monitoring.Services
         public string? OperatorMobile { get; set; }
         public string? JeName { get; set; }
         public string? JeMobile { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 
     public class UserSelectionDto

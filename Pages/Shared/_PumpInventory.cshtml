@@ -51,8 +51,14 @@
             <tbody>
                 @foreach (var pump in Model)
                 {
-                    <tr>
-                        <td>@pump.PumpId</td>
+                    <tr class="@(pump.IsActive ? null : "table-secondary opacity-75")">
+                        <td>
+                            @pump.PumpId
+                            @if (!pump.IsActive)
+                            {
+                                <span class="badge bg-secondary ms-1">Inactive</span>
+                            }
+                        </td>
                         <td>@pump.VendorName</td>
                         <td>@pump.Location</td>
 
@@ -142,18 +148,29 @@
                                 </button>
                             }
 
-                            @* Delete — Admin only *@
+                            @* Activate / Deactivate — Admin only. Deactivated pumps are
+                               hidden from the dashboard but stay here so they can be re-enabled. *@
                             @if (isAdmin)
                             {
                                 <form method="post"
-                                      asp-page-handler="DeletePump"
+                                      asp-page-handler="SetActive"
                                       asp-route-id="@pump.PumpId"
+                                      asp-route-active="@((!pump.IsActive).ToString().ToLowerInvariant())"
                                       class="d-inline"
-                                      onsubmit="return confirm('Delete this pump?');">
+                                      onsubmit="return confirm('@(pump.IsActive ? "Deactivate this pump? It will be hidden from the dashboard." : "Activate this pump?")');">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Pump">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if (pump.IsActive)
+                                    {
+                                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Deactivate pump (hide from dashboard)">
+                                            <i class="bi bi-pause-circle"></i> Deactivate
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="submit" class="btn btn-outline-success btn-sm" title="Activate pump">
+                                            <i class="bi bi-play-circle"></i> Activate
+                                        </button>
+                                    }
                                 </form>
                             }
                         </td>

@@ -60,7 +60,7 @@ namespace asset_monitoring.Pages
                 .Where(u => u.IsActive)
                 .ToListAsync();
 
-            Pumps = await _pumpDashboardService.GetPumpsAsync();
+            Pumps = await _pumpDashboardService.GetAllPumpsAsync(); // incl. deactivated, so admin can re-activate
             RunningSummary = await _pumpDashboardService.GetPumpRunningSummaryAsync(
                 year: summaryYear, month: summaryMonth);
 
@@ -132,6 +132,18 @@ namespace asset_monitoring.Pages
 
             Logger.Info("OnPostDeletePumpAsync: soft-deleting pumpId={0} by admin={1}", id, Username);
             await _pumpDashboardService.DeletePumpAsync(id);
+            return RedirectToPage();
+        }
+
+        // Activate / deactivate a pump. Deactivated pumps drop off the dashboard
+        // but remain in the inventory so they can be re-activated.
+        public async Task<IActionResult> OnPostSetActiveAsync(int id, bool active)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return UnauthorizedJson();
+
+            Logger.Info("OnPostSetActiveAsync: pumpId={0} active={1} by admin={2}", id, active, Username);
+            await _pumpDashboardService.SetPumpActiveAsync(id, active);
             return RedirectToPage();
         }
 
