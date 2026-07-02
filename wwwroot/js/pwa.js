@@ -109,9 +109,10 @@
     var btn = document.getElementById('bdaAlertsBtn');
     if (!btn) return;
     if (Notification.permission === 'granted' && !alertsOptedOut()) {
-      setAlertsBtn(btn, 'btn-outline-secondary', 'bi-bell-slash', 'Disable alerts', function () { disableAlerts(reg); });
+      // Light/contrasting styles so the button is legible on the blue navbar.
+      setAlertsBtn(btn, 'btn-outline-light', 'bi-bell-slash', 'Disable alerts', function () { disableAlerts(reg); });
     } else if (Notification.permission !== 'denied') {
-      setAlertsBtn(btn, 'btn-primary', 'bi-bell', 'Enable alerts', function () { subscribe(reg); });
+      setAlertsBtn(btn, 'btn-light', 'bi-bell', 'Enable alerts', function () { subscribe(reg); });
     } else {
       btn.style.display = 'none';
     }
