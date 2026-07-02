@@ -336,6 +336,15 @@ namespace asset_monitoring.Services
 
                 // 2. BdaPumpLocation (upsert)
                 var location = await _db.BdaPumpLocations.FindAsync(req.PumpId);
+
+                // Capture vendor + location for the status-change push BEFORE the upsert
+                // below overwrites the location (a status toggle shouldn't lose it).
+                // Prefer the request values; fall back to what's currently stored.
+                var notifyVendor  = pump.VendorName ?? "";
+                var notifyLocName = !string.IsNullOrWhiteSpace(req.LocationName) ? req.LocationName : location?.LocationName;
+                var notifyLat     = req.Latitude  ?? location?.Latitude;
+                var notifyLng     = req.Longitude ?? location?.Longitude;
+
                 if (location == null)
                 {
                     _db.BdaPumpLocations.Add(new BdaPumpLocation
@@ -471,12 +480,29 @@ namespace asset_monitoring.Services
                 {
                     var opMobile = entry.OperatorMobile;
                     var jeMobile = entry.JeMobile;
-                    var title    = "Pump status changed";
-                    var body     = $"Pump {req.PumpId}: {StatusLabel(fromStatus)} → {StatusLabel(entry.Status)}";
+
+                    var title = $"Pump {req.PumpId}: {StatusLabel(fromStatus)} → {StatusLabel(entry.Status)}";
+
+                    var lines = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(notifyVendor))  lines.Add(notifyVendor);
+                    if (!string.IsNullOrWhiteSpace(notifyLocName)) lines.Add(notifyLocName!);
+
+                    // Tap target: Google Maps at the pump's coordinates when known,
+                    // otherwise the recipient's app page.
+                    string? mapsUrl = null;
+                    if (notifyLat.HasValue && notifyLng.HasValue)
+                    {
+                        var inv = System.Globalization.CultureInfo.InvariantCulture;
+                        mapsUrl = "https://www.google.com/maps/search/?api=1&query="
+                                + notifyLat.Value.ToString(inv) + "," + notifyLng.Value.ToString(inv);
+                        lines.Add("Tap to open location in Google Maps");
+                    }
+                    var body = string.Join("\n", lines);
+
                     if (!string.IsNullOrWhiteSpace(opMobile))
-                        _ = Task.Run(() => _push.SendToMobileAsync(opMobile!, title, body, "/Operator"));
+                        _ = Task.Run(() => _push.SendToMobileAsync(opMobile!, title, body, mapsUrl ?? "/Operator"));
                     if (!string.IsNullOrWhiteSpace(jeMobile) && jeMobile != opMobile)
-                        _ = Task.Run(() => _push.SendToMobileAsync(jeMobile!, title, body, "/JuniorEngineer"));
+                        _ = Task.Run(() => _push.SendToMobileAsync(jeMobile!, title, body, mapsUrl ?? "/JuniorEngineer"));
                 }
 
                 // Refresh today's daily summary in the background (fire-and-forget)
