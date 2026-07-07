@@ -578,6 +578,21 @@
             `;
 
             marker.bindTooltip(tooltip, { sticky: true, direction: 'top', opacity: 0.95 });
+
+            // Click/tap popup with a navigation link — Google Maps directions from
+            // the user's current position to the pump.
+            const dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${pump.latitude},${pump.longitude}`;
+            marker.bindPopup(`
+                <div style="min-width:180px">
+                    <strong>${pump.vendorName ?? ''}</strong><br/>
+                    ${pump.location ?? ''}<br/>
+                    Status: ${pump.status}<br/>
+                    <a href="${dirUrl}" target="_blank" rel="noopener"
+                       class="btn btn-sm btn-primary mt-2 w-100">
+                        <i class="bi bi-sign-turn-right-fill"></i> Open in Google Maps
+                    </a>
+                </div>`);
+
             markersLayer.addLayer(marker);
         }
 
