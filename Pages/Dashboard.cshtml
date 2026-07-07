@@ -99,11 +99,17 @@
         </div>
         <div class="col-12 col-md-6" id="tableCol">
             <div class="card h-100 d-flex flex-column">
-                <div class="d-flex align-items-center gap-3 px-3 pt-2 pb-1 small flex-wrap status-legend">
+                <div class="d-flex align-items-center gap-2 px-3 pt-2 pb-1 small flex-wrap status-legend">
                     <span class="fw-semibold text-muted">Status:</span>
-                    <span><span class="badge-status-on">ON</span> Running</span>
-                    <span><span class="badge-status-off">OFF</span> Stopped</span>
-                    <span><span class="badge-status-maint">MAINT</span> Maintenance</span>
+                    <button type="button" class="status-filter-btn" data-status-filter="ON" title="Show only running pumps">
+                        <span class="badge-status-on">ON</span> Running
+                    </button>
+                    <button type="button" class="status-filter-btn" data-status-filter="OFF" title="Show only stopped pumps">
+                        <span class="badge-status-off">OFF</span> Stopped
+                    </button>
+                    <button type="button" class="status-filter-btn" data-status-filter="MAINT" title="Show only pumps under maintenance">
+                        <span class="badge-status-maint">MAINT</span> Maintenance
+                    </button>
                 </div>
                 <div class="table-responsive">
                 <table class="table table-dashboard mb-0 align-middle">
@@ -425,6 +431,46 @@
         let lastRefreshTime = Date.now();
         const prevStatuses = {};
 
+        // ── Status-legend filter (click ON / OFF / MAINT to filter table + map) ──
+        let activeStatusFilter = null;   // 'ON' | 'OFF' | 'MAINT' | null
+        let lastPumpsData = null;        // last ?handler=Refresh payload, for marker re-render
+
+        function passesStatusFilter(p) {
+            if (!activeStatusFilter) return true;
+            const s = p.status === 'MAINTENANCE' ? 'MAINT' : p.status;
+            return s === activeStatusFilter;
+        }
+
+        function applyStatusFilter(updateMarkers = true) {
+            // Table rows — match the text of the sticky Status column (ON / OFF / MAINT)
+            document.querySelectorAll('.table-dashboard tbody tr').forEach(tr => {
+                const s = (tr.cells[5] ? tr.cells[5].textContent : '').trim();
+                tr.style.display = (!activeStatusFilter || s === activeStatusFilter) ? '' : 'none';
+            });
+            // Legend button states — highlight the active filter, dim the others
+            document.querySelectorAll('.status-filter-btn').forEach(b => {
+                const active = b.dataset.statusFilter === activeStatusFilter;
+                b.classList.toggle('active', active);
+                b.classList.toggle('dimmed', !!activeStatusFilter && !active);
+            });
+            // Map markers — re-render from the cached payload
+            if (updateMarkers && lastPumpsData && markersLayer) {
+                markersLayer.clearLayers();
+                lastPumpsData.forEach(p => {
+                    if (passesStatusFilter(p) && p.latitude && p.longitude) addPumpMarker(p);
+                });
+            }
+        }
+
+        document.querySelectorAll('.status-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeStatusFilter = activeStatusFilter === btn.dataset.statusFilter
+                    ? null                              // clicking the active filter clears it
+                    : btn.dataset.statusFilter;
+                applyStatusFilter();
+            });
+        });
+
         document.addEventListener("DOMContentLoaded", () => {
             initLeafletMap();
         });
@@ -474,6 +520,7 @@
 
                     // ── Rebuild map markers ─────────────────────────────────
                     markersLayer.clearLayers();
+                    lastPumpsData = data.pumps;
 
                     data.pumps.forEach(p => {
                         // Row flash on status change
@@ -503,8 +550,12 @@
                             }
                         }
 
-                        if (p.latitude && p.longitude) addPumpMarker(p);
+                        if (passesStatusFilter(p) && p.latitude && p.longitude) addPumpMarker(p);
                     });
+
+                    // Statuses may have changed — re-apply the active filter to the
+                    // patched rows (markers above are already filtered).
+                    applyStatusFilter(false);
 
                     lastRefreshTime = Date.now();
                 })
@@ -633,9 +684,9 @@
                 if (icon) icon.textContent = '⇅';
             });
 
-            // 3. Show all rows (in case sort hid any)
-            document.querySelectorAll('.table-dashboard tbody tr')
-                .forEach(tr => tr.style.display = '');
+            // 3. Clear the status filter (shows all rows + restores all markers)
+            activeStatusFilter = null;
+            applyStatusFilter();
 
             // 4. Spin the reset icon for visual feedback
             const icon = btnReset.querySelector('i');

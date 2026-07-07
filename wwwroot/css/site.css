@@ -324,6 +324,31 @@ html {
     padding: .25em 1.1em;
 }
 
+/* Clickable status-legend filters (dashboard table header) */
+.status-filter-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color .15s ease, opacity .15s ease, border-color .15s ease;
+}
+
+.status-filter-btn:hover {
+    background-color: rgba(37, 99, 235, .08);
+}
+
+.status-filter-btn.active {
+    background-color: rgba(37, 99, 235, .10);
+    border-color: #2563EB;
+}
+
+.status-filter-btn.dimmed {
+    opacity: .45;
+}
+
 /* Buttons */
 .btn-primary,
 .btn-outline-primary {
