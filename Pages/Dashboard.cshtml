@@ -570,28 +570,25 @@
                 { icon: icon }
             );
 
-            const tooltip = `
-                <strong>${pump.vendorName}</strong><br/>
-                Location: ${pump.location ?? "—"}<br/>
-                Status: ${pump.status}<br/>
-                Last Updated: ${new Date(pump.lastUpdated).toLocaleString()}
-            `;
-
-            marker.bindTooltip(tooltip, { sticky: true, direction: 'top', opacity: 0.95 });
-
-            // Click/tap popup with a navigation link — Google Maps directions from
-            // the user's current position to the pump.
-            const dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${pump.latitude},${pump.longitude}`;
+            // Tap/click popup with a clear, high-contrast navigation button.
+            // (No hover tooltip: it duplicated this content and overlapped the popup,
+            //  and hover doesn't work on phones anyway.)
+            const dirUrl  = `https://www.google.com/maps/dir/?api=1&destination=${pump.latitude},${pump.longitude}`;
+            const stColor = pump.status === 'ON' ? '#16a34a'
+                          : pump.status === 'MAINTENANCE' ? '#d97706' : '#dc2626';
             marker.bindPopup(`
-                <div style="min-width:180px">
-                    <strong>${pump.vendorName ?? ''}</strong><br/>
-                    ${pump.location ?? ''}<br/>
-                    Status: ${pump.status}<br/>
+                <div style="min-width:200px;font-family:system-ui,-apple-system,sans-serif;line-height:1.4">
+                    <div style="font-weight:700;font-size:14px;color:#1e293b">${pump.vendorName ?? ''}</div>
+                    <div style="color:#64748b;font-size:12px">${pump.location ?? ''}</div>
+                    <div style="font-size:12px;margin-top:2px;color:#334155">Status:
+                        <span style="color:${stColor};font-weight:700">${pump.status}</span></div>
                     <a href="${dirUrl}" target="_blank" rel="noopener"
-                       class="btn btn-sm btn-primary mt-2 w-100">
-                        <i class="bi bi-sign-turn-right-fill"></i> Open in Google Maps
+                       style="display:flex;align-items:center;justify-content:center;gap:6px;
+                              margin-top:10px;padding:9px 12px;background:#1a73e8;color:#ffffff;
+                              border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
+                        <span style="font-size:15px;line-height:1">&#10148;</span> Open in Google Maps
                     </a>
-                </div>`);
+                </div>`, { minWidth: 210 });
 
             markersLayer.addLayer(marker);
         }
