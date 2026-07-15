@@ -21,6 +21,16 @@ namespace asset_monitoring.Data.Configurations
                   .HasMaxLength(100)
                   .IsRequired();
 
+            entity.Property(e => e.VendorId)
+                  .HasColumnName("vendor_id");
+
+            entity.Property(e => e.PumpNo)
+                  .HasColumnName("pump_no");
+
+            entity.Property(e => e.LegacyVendorName)
+                  .HasColumnName("legacy_vendor_name")
+                  .HasMaxLength(100);
+
             entity.Property(e => e.UpdatedBy)
                   .HasColumnName("updated_by")
                   .HasMaxLength(100);

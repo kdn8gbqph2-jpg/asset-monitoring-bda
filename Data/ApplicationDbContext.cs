@@ -12,6 +12,7 @@ namespace asset_monitoring.Data
         }
 
         public DbSet<BdaPumpMaster> BdaPumpMasters { get; set; } = null!;
+        public DbSet<BdaVendorMaster> BdaVendorMasters { get; set; } = null!;
         public DbSet<BdaPumpLocation> BdaPumpLocations { get; set; } = null!;
         public DbSet<BdaUserMaster> BdaUserMasters { get; set; } = null!;
         public DbSet<PumpStatusLog> PumpStatusLogs { get; set; } = null!;
@@ -24,6 +25,7 @@ namespace asset_monitoring.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfiguration(new BdaPumpMasterConfig());
+            modelBuilder.ApplyConfiguration(new BdaVendorMasterConfig());
             modelBuilder.ApplyConfiguration(new BdaPumpLocationConfig());
             modelBuilder.ApplyConfiguration(new BdaUserMasterConfig());
             modelBuilder.ApplyConfiguration(new PumpStatusEntryConfig());

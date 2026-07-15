@@ -40,7 +40,8 @@
             <thead class="sticky-top" style="top: 0; z-index: 1;">
                 <tr>
                     <th>PUMP ID</th>
-                    <th>VENDOR</th>
+                    <th>CONTRACTOR</th>
+                    <th>PUMP #</th>
                     <th>LOCATION</th>
                     <th>OPERATOR</th>
                     <th>JUNIOR ENGINEER</th>
@@ -59,7 +60,28 @@
                                 <span class="badge bg-secondary ms-1">Inactive</span>
                             }
                         </td>
-                        <td>@pump.VendorName</td>
+                        @* Contractor + its own pump number. Un-migrated rows have no
+                           ContractorName, so fall back to the legacy composite string. *@
+                        <td>
+                            @if (!string.IsNullOrEmpty(pump.ContractorName))
+                            {
+                                @pump.ContractorName
+                            }
+                            else
+                            {
+                                <span class="text-muted fst-italic">@pump.VendorName</span>
+                            }
+                        </td>
+                        <td class="text-nowrap">
+                            @if (pump.PumpNo.HasValue)
+                            {
+                                <span class="fw-semibold">Pump @pump.PumpNo</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
                         <td>@pump.Location</td>
 
                         <!-- Operator -->

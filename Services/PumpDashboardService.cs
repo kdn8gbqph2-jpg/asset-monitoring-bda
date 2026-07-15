@@ -67,6 +67,17 @@ namespace asset_monitoring.Services
         private const string ADMIN_CACHE_KEY = "PUMP_DASHBOARD_ADMIN";
 
         /// <summary>
+        /// Single source of truth for how a pump is named to users:
+        /// "{Contractor} - Pump {n}" once the pump has been migrated to
+        /// vendor_id + pump_no, otherwise the legacy free-text vendor_name
+        /// (e.g. "Pump_2_Devanshi_contractor") so un-migrated rows still render.
+        /// </summary>
+        public static string PumpDisplayName(string? contractor, int? pumpNo, string? legacyVendorName)
+            => (!string.IsNullOrWhiteSpace(contractor) && pumpNo.HasValue)
+                ? $"{contractor} - Pump {pumpNo.Value}"
+                : (legacyVendorName ?? "");
+
+        /// <summary>
         /// Ensure DateTime has Kind=Utc so System.Text.Json adds "Z" suffix.
         /// The browser's toLocaleString() then converts UTC → user's local timezone.
         /// </summary>
@@ -170,6 +181,8 @@ namespace asset_monitoring.Services
                     where includeInactive || pump.IsActive
                     join loc   in _db.BdaPumpLocations   on pump.PumpId equals loc.PumpId   into locGroup
                     from loc   in locGroup.DefaultIfEmpty()
+                    join ven   in _db.BdaVendorMasters   on pump.VendorId equals (int?)ven.VendorId into venGroup
+                    from ven   in venGroup.DefaultIfEmpty()
                     join entry in _db.PumpStatusEntries  on pump.PumpId equals entry.PumpId into entryGroup
                     from entry in entryGroup.DefaultIfEmpty()
                     where (operatorMobile == null && jeMobile == null)
@@ -179,6 +192,8 @@ namespace asset_monitoring.Services
                     {
                         pump.PumpId,
                         pump.VendorName,
+                        ContractorName = ven != null ? ven.VendorName : null,
+                        pump.PumpNo,
                         pump.IsActive,
                         LocationName     = loc   != null ? loc.LocationName          : null,
                         Latitude         = loc   != null ? loc.Latitude              : (decimal?)null,
@@ -195,7 +210,9 @@ namespace asset_monitoring.Services
                 var pumps = rawData.Select(r => new DashboardPumpDto
                 {
                     PumpId         = r.PumpId.ToString(),
-                    VendorName     = r.VendorName,
+                    VendorName     = PumpDisplayName(r.ContractorName, r.PumpNo, r.VendorName),
+                    ContractorName = r.ContractorName,
+                    PumpNo         = r.PumpNo,
                     Location       = r.LocationName,
                     Latitude       = r.Latitude,
                     Longitude      = r.Longitude,
@@ -340,7 +357,13 @@ namespace asset_monitoring.Services
                 // Capture vendor + location for the status-change push BEFORE the upsert
                 // below overwrites the location (a status toggle shouldn't lose it).
                 // Prefer the request values; fall back to what's currently stored.
-                var notifyVendor  = pump.VendorName ?? "";
+                var contractorName = pump.VendorId.HasValue
+                    ? await _db.BdaVendorMasters
+                        .Where(v => v.VendorId == pump.VendorId.Value)
+                        .Select(v => v.VendorName)
+                        .FirstOrDefaultAsync()
+                    : null;
+                var notifyVendor  = PumpDisplayName(contractorName, pump.PumpNo, pump.VendorName);
                 var notifyLocName = !string.IsNullOrWhiteSpace(req.LocationName) ? req.LocationName : location?.LocationName;
                 var notifyLat     = req.Latitude  ?? location?.Latitude;
                 var notifyLng     = req.Longitude ?? location?.Longitude;
@@ -690,6 +713,8 @@ namespace asset_monitoring.Services
                     where pump.IsActive
                     join loc   in _db.BdaPumpLocations  on pump.PumpId equals loc.PumpId   into lg
                     from loc   in lg.DefaultIfEmpty()
+                    join ven   in _db.BdaVendorMasters  on pump.VendorId equals (int?)ven.VendorId into vg
+                    from ven   in vg.DefaultIfEmpty()
                     join entry in _db.PumpStatusEntries on pump.PumpId equals entry.PumpId into eg
                     from entry in eg.DefaultIfEmpty()
                     where (operatorMobile == null && jeMobile == null)
@@ -699,6 +724,8 @@ namespace asset_monitoring.Services
                     {
                         pump.PumpId,
                         pump.VendorName,
+                        ContractorName   = ven != null ? ven.VendorName : null,
+                        pump.PumpNo,
                         LocationName     = loc   != null ? loc.LocationName          : null,
                         EntryStatus      = entry != null ? (PumpStatus?)entry.Status : null,
                         LastUpdated      = entry != null ? entry.RowUpdationDateTime : pump.RowUpdationDateTime,
@@ -750,7 +777,7 @@ namespace asset_monitoring.Services
                     return new PumpRunningSummaryDto
                     {
                         PumpId                   = p.PumpId.ToString(),
-                        VendorName               = p.VendorName,
+                        VendorName               = PumpDisplayName(p.ContractorName, p.PumpNo, p.VendorName),
                         Location                 = p.LocationName,
                         Status                   = p.EntryStatus switch
                         {
@@ -854,7 +881,19 @@ namespace asset_monitoring.Services
     public class DashboardPumpDto
     {
         public string PumpId { get; set; } = "";
+
+        /// <summary>
+        /// The pump's DISPLAY name — "{Contractor} - Pump {n}" once migrated, else the
+        /// legacy free-text vendor_name. Every existing view/export/notification binds
+        /// to this, so they all pick up the normalised name with no change.
+        /// </summary>
         public string? VendorName { get; set; }
+
+        /// <summary>Contractor name on its own (NULL for un-migrated rows).</summary>
+        public string? ContractorName { get; set; }
+
+        /// <summary>Pump number within its contractor (NULL for un-migrated rows).</summary>
+        public int? PumpNo { get; set; }
         public string? Location { get; set; }
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
