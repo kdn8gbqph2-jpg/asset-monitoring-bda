@@ -29,6 +29,21 @@
 
     // Colspan for the empty-state row: 1 select + 4 base + 3 today (if current) + 3 month + 1 last updated
     var emptyColspan = isCurrent ? 12 : 9;
+
+    // Group the pumps by contractor so each contractor is one collapsible block
+    // (this is what vendor normalisation bought us — a real per-contractor rollup).
+    var contractorGroups = rows
+        .GroupBy(r => string.IsNullOrWhiteSpace(r.ContractorName) ? "Unassigned" : r.ContractorName!)
+        .OrderBy(g => g.Key)
+        .Select(g => new
+        {
+            Contractor = g.Key,
+            Pumps      = g.OrderBy(p => p.PumpNo ?? int.MaxValue).ThenBy(p => p.PumpId).ToList(),
+            MonthRun   = g.Sum(p => p.MonthRunMinutes),
+            TodayRun   = g.Sum(p => p.TodayRunMinutes),
+            RunningNow = g.Count(p => p.Status == "ON")
+        })
+        .ToList();
 }
 
 <div class="card mb-4">
@@ -87,15 +102,15 @@
         </div>
     }
 
-    <div class="table-responsive">
+    <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
         <table class="table table-dashboard summary-table align-middle text-center">
-            <thead>
+            <thead class="sticky-top" style="top: 0; z-index: 2;">
                 <tr>
                     <th rowspan="2" class="align-middle">
                         <input type="checkbox" id="rlSelectAll" title="Select / deselect all pumps" />
                     </th>
                     <th rowspan="2" class="align-middle text-start">PUMP ID</th>
-                    <th rowspan="2" class="align-middle text-start col-hide-mobile">VENDOR</th>
+                    <th rowspan="2" class="align-middle text-start col-hide-mobile">PUMP</th>
                     <th rowspan="2" class="align-middle text-start col-hide-mobile">LOCATION</th>
                     <th rowspan="2" class="align-middle">STATUS</th>
                     @if (isCurrent)
@@ -154,11 +169,43 @@
             }
             else
             {
-                foreach (var item in rows)
+                foreach (var grp in contractorGroups)
                 {
-                    <tr>
+                    var gid = "grp-" + grp.Contractor.GetHashCode().ToString("X");
+                    @* Contractor header — click to collapse/expand this contractor's pumps *@
+                    <tr class="contractor-group-header" data-group="@gid">
                         <td>
-                            <input type="checkbox" class="rl-select" value="@item.PumpId"
+                            <input type="checkbox" class="rl-select-group" data-group="@gid"
+                                   title="Select all of @grp.Contractor's pumps"
+                                   onclick="event.stopPropagation();" />
+                        </td>
+                        <td colspan="@(emptyColspan - 1)" class="text-start">
+                            <i class="bi bi-chevron-down grp-chevron me-1"></i>
+                            <span class="fw-semibold">@grp.Contractor</span>
+                            <span class="badge bg-secondary ms-2">@grp.Pumps.Count pumps</span>
+                            @if (grp.RunningNow > 0)
+                            {
+                                <span class="badge bg-success-subtle text-success ms-1">@grp.RunningNow running</span>
+                            }
+                            <span class="ms-3 small text-muted">
+                                @monthLabel:
+                                <span class="fw-semibold @(grp.MonthRun > 0 ? "text-success" : "text-muted")">@FormatRunTime(grp.MonthRun)</span>
+                                @if (isCurrent)
+                                {
+                                    <span class="ms-2">
+                                        · Today:
+                                        <span class="fw-semibold @(grp.TodayRun > 0 ? "text-success" : "text-muted")">@FormatRunTime(grp.TodayRun)</span>
+                                    </span>
+                                }
+                            </span>
+                        </td>
+                    </tr>
+
+                foreach (var item in grp.Pumps)
+                {
+                    <tr class="contractor-row" data-group="@gid">
+                        <td>
+                            <input type="checkbox" class="rl-select" value="@item.PumpId" data-group="@gid"
                                    title="Select pump @item.PumpId for the running-log download" />
                         </td>
                         <td class="fw-semibold text-start">
@@ -167,7 +214,17 @@
                                 @item.PumpId
                             </a>
                         </td>
-                        <td class="text-start col-hide-mobile">@item.VendorName</td>
+                        @* Contractor lives in the group header, so the row only needs its number *@
+                        <td class="text-start col-hide-mobile">
+                            @if (item.PumpNo.HasValue)
+                            {
+                                <span>Pump @item.PumpNo</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@item.VendorName</span>
+                            }
+                        </td>
                         <td class="text-start col-hide-mobile">@item.Location</td>
                         <td>
                             @if (item.Status == "ON")
@@ -222,6 +279,7 @@
                             @ToIst(item.LastUpdated)
                         </td>
                     </tr>
+                }
                 }
             }
             </tbody>
@@ -299,12 +357,35 @@
     });
 })();
 
+// ── Contractor groups: collapse / expand + per-group select ──────────────
+(function () {
+    // Toggle a contractor's pump rows. Plain class toggling rather than Bootstrap
+    // collapse, which fights <tr> display semantics.
+    document.querySelectorAll('.contractor-group-header').forEach(hdr => {
+        hdr.addEventListener('click', () => {
+            const gid = hdr.dataset.group;
+            const collapsed = hdr.classList.toggle('collapsed');
+            document.querySelectorAll(`tr.contractor-row[data-group="${gid}"]`)
+                .forEach(tr => tr.classList.toggle('d-none', collapsed));
+        });
+    });
+
+    // Group checkbox ticks/unticks just that contractor's pumps.
+    document.querySelectorAll('.rl-select-group').forEach(gcb => {
+        gcb.addEventListener('change', () => {
+            document.querySelectorAll(`.rl-select[data-group="${gcb.dataset.group}"]`)
+                .forEach(cb => { cb.checked = gcb.checked; });
+        });
+    });
+})();
+
 // ── Running Log: select pumps, then download their detailed log (Excel) ───
 (function () {
     const all = document.getElementById('rlSelectAll');
     if (all) {
         all.addEventListener('change', () => {
             document.querySelectorAll('.rl-select').forEach(cb => { cb.checked = all.checked; });
+            document.querySelectorAll('.rl-select-group').forEach(cb => { cb.checked = all.checked; });
         });
     }
 

@@ -324,6 +324,46 @@ html {
     padding: .25em 1.1em;
 }
 
+/* Contractor grouping in the Pump Running Summary */
+.contractor-group-header {
+    background-color: #eef4ff;
+    cursor: pointer;
+    user-select: none;
+}
+
+.contractor-group-header:hover {
+    background-color: #e2ecff;
+}
+
+.contractor-group-header .grp-chevron {
+    transition: transform .15s ease;
+    display: inline-block;
+    color: #2563EB;
+}
+
+/* Chevron points right when the contractor's pumps are hidden */
+.contractor-group-header.collapsed .grp-chevron {
+    transform: rotate(-90deg);
+}
+
+/* Collapsible card sections (e.g. User Management) */
+.section-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.section-toggle .grp-chevron {
+    transition: transform .15s ease;
+    display: inline-block;
+}
+
+.section-toggle.collapsed .grp-chevron {
+    transform: rotate(-90deg);
+}
+
+/* (No background rule needed for the sticky summary header: .table-dashboard th
+   already sets an opaque background with !important.) */
+
 /* Clickable status-legend filters (dashboard table header) */
 .status-filter-btn {
     background: none;

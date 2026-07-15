@@ -805,6 +805,8 @@ namespace asset_monitoring.Services
                     {
                         PumpId                   = p.PumpId.ToString(),
                         VendorName               = PumpDisplayName(p.ContractorName, p.PumpNo, p.VendorName),
+                        ContractorName           = p.ContractorName,
+                        PumpNo                   = p.PumpNo,
                         Location                 = p.LocationName,
                         Status                   = p.EntryStatus switch
                         {
@@ -1028,7 +1030,15 @@ namespace asset_monitoring.Services
     public class PumpRunningSummaryDto
     {
         public string PumpId { get; set; } = "";
+
+        /// <summary>Derived display name — "{Contractor} - Pump {n}".</summary>
         public string? VendorName { get; set; }
+
+        /// <summary>Contractor on its own, so the summary can group by it.</summary>
+        public string? ContractorName { get; set; }
+
+        /// <summary>Pump number within its contractor.</summary>
+        public int? PumpNo { get; set; }
         public string? Location { get; set; }
         public string? Status { get; set; }
 
