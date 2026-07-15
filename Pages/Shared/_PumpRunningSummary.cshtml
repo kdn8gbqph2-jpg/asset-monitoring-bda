@@ -1,14 +1,27 @@
+@using System.Globalization
 @model asset_monitoring.Services.PumpRunningSummaryResult
 @{
     var ist = TimeZoneInfo.FindSystemTimeZoneById(
         OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
 
+    // Running hours are what contractors are measured on, so report a single
+    // decimal-hours figure rather than h+m. A spell under 6 minutes would round
+    // to "0.0 h" and read as "never ran", so it gets an explicit floor marker.
     string FormatRunTime(int minutes)
     {
         if (minutes <= 0) return "—";
+        if (minutes < 6) return "<0.1 h";
+        return (minutes / 60.0).ToString("0.0", CultureInfo.InvariantCulture) + " h";
+    }
+
+    // Exact value, surfaced on hover so the rounding above never loses detail.
+    string ExactRunTime(int minutes)
+    {
+        if (minutes <= 0) return "No time recorded";
         var h = minutes / 60;
         var m = minutes % 60;
-        return h > 0 ? $"{h}h {m}m" : $"{m}m";
+        var hm = h > 0 ? $"{h}h {m}m" : $"{m}m";
+        return $"{hm} — exactly {minutes} minute{(minutes == 1 ? "" : "s")}";
     }
 
     string ToIst(DateTime utc) =>
@@ -189,12 +202,14 @@
                             }
                             <span class="ms-3 small text-muted">
                                 @monthLabel:
-                                <span class="fw-semibold @(grp.MonthRun > 0 ? "text-success" : "text-muted")">@FormatRunTime(grp.MonthRun)</span>
+                                <span class="fw-semibold @(grp.MonthRun > 0 ? "text-success" : "text-muted")"
+                                      title="@ExactRunTime(grp.MonthRun)">@FormatRunTime(grp.MonthRun)</span>
                                 @if (isCurrent)
                                 {
                                     <span class="ms-2">
                                         · Today:
-                                        <span class="fw-semibold @(grp.TodayRun > 0 ? "text-success" : "text-muted")">@FormatRunTime(grp.TodayRun)</span>
+                                        <span class="fw-semibold @(grp.TodayRun > 0 ? "text-success" : "text-muted")"
+                                              title="@ExactRunTime(grp.TodayRun)">@FormatRunTime(grp.TodayRun)</span>
                                     </span>
                                 }
                             </span>
@@ -244,34 +259,40 @@
                         {
                             @* ── Today columns ── *@
                             <td>
-                                <span class="fw-semibold @(item.TodayRunMinutes > 0 ? "text-success" : "text-muted")">
+                                <span class="fw-semibold @(item.TodayRunMinutes > 0 ? "text-success" : "text-muted")"
+                                      title="@ExactRunTime(item.TodayRunMinutes)">
                                     @FormatRunTime(item.TodayRunMinutes)
                                 </span>
                             </td>
                             <td class="col-hide-mobile">
-                                <span class="fw-semibold @(item.TodayOffMinutes > 0 ? "text-danger" : "text-muted")">
+                                <span class="fw-semibold @(item.TodayOffMinutes > 0 ? "text-danger" : "text-muted")"
+                                      title="@ExactRunTime(item.TodayOffMinutes)">
                                     @FormatRunTime(item.TodayOffMinutes)
                                 </span>
                             </td>
                             <td class="col-hide-mobile">
-                                <span class="fw-semibold @(item.TodayMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
+                                <span class="fw-semibold @(item.TodayMaintenanceMinutes > 0 ? "text-warning" : "text-muted")"
+                                      title="@ExactRunTime(item.TodayMaintenanceMinutes)">
                                     @FormatRunTime(item.TodayMaintenanceMinutes)
                                 </span>
                             </td>
                         }
                         @* ── Month columns ── *@
                         <td>
-                            <span class="fw-semibold @(item.MonthRunMinutes > 0 ? "text-success" : "text-muted")">
+                            <span class="fw-semibold @(item.MonthRunMinutes > 0 ? "text-success" : "text-muted")"
+                                  title="@ExactRunTime(item.MonthRunMinutes)">
                                 @FormatRunTime(item.MonthRunMinutes)
                             </span>
                         </td>
                         <td class="col-hide-mobile">
-                            <span class="fw-semibold @(item.MonthOffMinutes > 0 ? "text-danger" : "text-muted")">
+                            <span class="fw-semibold @(item.MonthOffMinutes > 0 ? "text-danger" : "text-muted")"
+                                  title="@ExactRunTime(item.MonthOffMinutes)">
                                 @FormatRunTime(item.MonthOffMinutes)
                             </span>
                         </td>
                         <td class="col-hide-mobile">
-                            <span class="fw-semibold @(item.MonthMaintenanceMinutes > 0 ? "text-warning" : "text-muted")">
+                            <span class="fw-semibold @(item.MonthMaintenanceMinutes > 0 ? "text-warning" : "text-muted")"
+                                  title="@ExactRunTime(item.MonthMaintenanceMinutes)">
                                 @FormatRunTime(item.MonthMaintenanceMinutes)
                             </span>
                         </td>
