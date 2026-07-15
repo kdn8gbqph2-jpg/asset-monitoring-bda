@@ -366,3 +366,9 @@ MigrationBackup/
 FodyWeavers.xsd
 # Local dev settings — never commit credentials
 appsettings.Development.json
+
+# MCP server configs — these carry API tokens in plain text.
+# Never let one land in wwwroot: it is the static root and would be
+# served to the public (this happened with hostinger.mcp.json).
+*.mcp.json
+**/wwwroot/*.mcp.json
