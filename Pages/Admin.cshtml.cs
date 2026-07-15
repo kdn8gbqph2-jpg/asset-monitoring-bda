@@ -105,22 +105,41 @@ namespace asset_monitoring.Pages
             }
         }
 
+        // Contractors for the Add/Edit pump drawer dropdown.
+        public async Task<IActionResult> OnGetVendorsAsync()
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return UnauthorizedJson();
+            return new JsonResult(await _pumpDashboardService.GetVendorsAsync());
+        }
+
+        // Next free pump number for a contractor, so onboarding pre-fills it.
+        public async Task<IActionResult> OnGetNextPumpNoAsync(int vendorId)
+        {
+            if (!IsLoggedIn || UserType != "ADMIN")
+                return UnauthorizedJson();
+            return new JsonResult(new { pumpNo = await _pumpDashboardService.GetNextPumpNoAsync(vendorId) });
+        }
+
         public async Task<IActionResult> OnPostAddPumpAsync([FromBody] AddPumpRequest req)
         {
             if (!IsLoggedIn || UserType != "ADMIN")
                 return UnauthorizedJson();
 
-            Logger.Info("OnPostAddPumpAsync: vendor={0}, location={1}", req.VendorName, req.LocationName);
+            Logger.Info("OnPostAddPumpAsync: vendorId={0}, newVendor={1}, location={2}",
+                req.VendorId, req.NewVendorName, req.LocationName);
             try
             {
                 req.UpdatedBy = Username;
-                var newId = await _pumpDashboardService.AddPumpAsync(req);
-                Logger.Info("OnPostAddPumpAsync: created pumpId={0}", newId);
-                return new JsonResult(new { success = true, pumpId = newId });
+                var result = await _pumpDashboardService.AddPumpAsync(req);
+                Logger.Info("OnPostAddPumpAsync: created pumpId={0}", result.PumpId);
+                // vendorId is echoed so "save & add another" can keep the contractor
+                // selected — it may have just been created server-side.
+                return new JsonResult(new { success = true, pumpId = result.PumpId, vendorId = result.VendorId, pumpNo = result.PumpNo });
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "OnPostAddPumpAsync failed for vendor={0}", req.VendorName);
+                Logger.Error(ex, "OnPostAddPumpAsync failed for vendorId={0}", req.VendorId);
                 return new JsonResult(new { success = false, message = "Failed to add pump" });
             }
         }

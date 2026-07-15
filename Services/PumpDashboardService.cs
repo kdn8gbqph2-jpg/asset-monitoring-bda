@@ -22,10 +22,16 @@ namespace asset_monitoring.Services
         public string? UpdatedBy { get; set; }        // operator mobile (set by handler)
         public string? OperatorMobile { get; set; }   // assigned operator's mobile
         public string? JeMobile { get; set; }          // assigned JE's mobile
+
+        // Contractor + per-contractor number. NULL from the operator/JE status
+        // flows, which must not disturb them — see the guards in UpdatePumpDetailsAsync.
+        public int? VendorId { get; set; }
+        public int? PumpNo { get; set; }
     }
 
     public class AddPumpRequest
     {
+        /// <summary>Legacy free-text name. Only used as a fallback if no contractor is chosen.</summary>
         public string VendorName { get; set; } = "";
         public string? Category { get; set; }
         public string LocationName { get; set; } = "";
@@ -34,6 +40,20 @@ namespace asset_monitoring.Services
         public string? OperatorMobile { get; set; }
         public string? JeMobile { get; set; }
         public string? UpdatedBy { get; set; }
+
+        /// <summary>Existing contractor to attach this pump to.</summary>
+        public int? VendorId { get; set; }
+        /// <summary>New contractor to create (used when VendorId is not supplied).</summary>
+        public string? NewVendorName { get; set; }
+        /// <summary>Pump number within the contractor. Auto-assigned (max+1) when omitted.</summary>
+        public int? PumpNo { get; set; }
+    }
+
+    public class VendorDto
+    {
+        public int VendorId { get; set; }
+        public string VendorName { get; set; } = "";
+        public int PumpCount { get; set; }
     }
 
     public class PumpLogDto
@@ -192,6 +212,7 @@ namespace asset_monitoring.Services
                     {
                         pump.PumpId,
                         pump.VendorName,
+                        pump.VendorId,
                         ContractorName = ven != null ? ven.VendorName : null,
                         pump.PumpNo,
                         pump.IsActive,
@@ -211,6 +232,7 @@ namespace asset_monitoring.Services
                 {
                     PumpId         = r.PumpId.ToString(),
                     VendorName     = PumpDisplayName(r.ContractorName, r.PumpNo, r.VendorName),
+                    VendorId       = r.VendorId,
                     ContractorName = r.ContractorName,
                     PumpNo         = r.PumpNo,
                     Location       = r.LocationName,
@@ -350,6 +372,11 @@ namespace asset_monitoring.Services
                 pump.IsActive            = req.IsActive;
                 pump.UpdatedBy           = req.UpdatedBy;
                 pump.RowUpdationDateTime = now;
+
+                // Contractor / pump number: only when supplied. The operator "change
+                // status" and JE flows don't send these and must not null them out.
+                if (req.VendorId.HasValue) pump.VendorId = req.VendorId;
+                if (req.PumpNo.HasValue)   pump.PumpNo   = req.PumpNo;
 
                 // 2. BdaPumpLocation (upsert)
                 var location = await _db.BdaPumpLocations.FindAsync(req.PumpId);
@@ -823,14 +850,86 @@ namespace asset_monitoring.Services
         };
 
         // ── Add new pump (master + location rows) ─────────────────────────────
-        public async Task<int> AddPumpAsync(AddPumpRequest req)
+        // ── Contractors, for the onboarding dropdown ──────────────────────────
+        public async Task<List<VendorDto>> GetVendorsAsync()
+            => await _db.BdaVendorMasters
+                .Where(v => v.IsActive)
+                .OrderBy(v => v.VendorName)
+                .Select(v => new VendorDto
+                {
+                    VendorId   = v.VendorId,
+                    VendorName = v.VendorName,
+                    PumpCount  = _db.BdaPumpMasters.Count(p => p.VendorId == v.VendorId)
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+        /// <summary>Next free pump number for a contractor (max + 1, starting at 1).</summary>
+        public async Task<int> GetNextPumpNoAsync(int vendorId)
         {
-            Logger.Info("AddPumpAsync: vendor={0}, location={1}", req.VendorName, req.LocationName);
+            var max = await _db.BdaPumpMasters
+                .Where(p => p.VendorId == vendorId)
+                .MaxAsync(p => (int?)p.PumpNo) ?? 0;
+            return max + 1;
+        }
+
+        /// <summary>
+        /// Resolve the contractor for an add: an existing VendorId, or create one from
+        /// NewVendorName (reusing a match, since vendor_name is UNIQUE).
+        /// </summary>
+        private async Task<(int? vendorId, string? vendorName)> ResolveVendorAsync(
+            int? vendorId, string? newVendorName, DateTime now)
+        {
+            if (vendorId.HasValue)
+            {
+                var name = await _db.BdaVendorMasters
+                    .Where(v => v.VendorId == vendorId.Value)
+                    .Select(v => v.VendorName)
+                    .FirstOrDefaultAsync();
+                return (name == null ? null : vendorId, name);
+            }
+
+            if (string.IsNullOrWhiteSpace(newVendorName)) return (null, null);
+
+            var trimmed = newVendorName.Trim();
+            var existing = await _db.BdaVendorMasters.FirstOrDefaultAsync(v => v.VendorName == trimmed);
+            if (existing != null) return (existing.VendorId, existing.VendorName);
+
+            var created = new BdaVendorMaster
+            {
+                VendorName           = trimmed,
+                IsActive             = true,
+                RowInsertionDateTime = now,
+                RowUpdationDateTime  = now
+            };
+            _db.BdaVendorMasters.Add(created);
+            await _db.SaveChangesAsync();   // need the generated vendor_id
+            Logger.Info("ResolveVendorAsync: created contractor '{0}' (id={1})", trimmed, created.VendorId);
+            return (created.VendorId, created.VendorName);
+        }
+
+        public async Task<AddPumpResult> AddPumpAsync(AddPumpRequest req)
+        {
+            Logger.Info("AddPumpAsync: vendorId={0}, newVendor={1}, location={2}",
+                req.VendorId, req.NewVendorName, req.LocationName);
             var now = DateTime.UtcNow;
+
+            var (vendorId, contractorName) = await ResolveVendorAsync(req.VendorId, req.NewVendorName, now);
+
+            // Pump number: honour an explicit one, else take the next free for this contractor.
+            var pumpNo = req.PumpNo;
+            if (vendorId.HasValue && !pumpNo.HasValue)
+                pumpNo = await GetNextPumpNoAsync(vendorId.Value);
+
+            // vendor_name is NOT NULL and is the display fallback — keep it in sync
+            // with the derived name so both paths agree.
+            var displayName = PumpDisplayName(contractorName, pumpNo, req.VendorName);
 
             var pump = new BdaPumpMaster
             {
-                VendorName           = req.VendorName,
+                VendorName           = string.IsNullOrWhiteSpace(displayName) ? (req.VendorName ?? "") : displayName,
+                VendorId             = vendorId,
+                PumpNo               = pumpNo,
                 Category             = req.Category,
                 IsActive             = true,
                 UpdatedBy            = req.UpdatedBy,
@@ -873,9 +972,18 @@ namespace asset_monitoring.Services
             await _db.SaveChangesAsync();
 
             _cache.Remove(ADMIN_CACHE_KEY);
-            Logger.Info("AddPumpAsync: created pumpId={0}, cache cleared", pump.PumpId);
-            return pump.PumpId;
+            Logger.Info("AddPumpAsync: created pumpId={0} (vendorId={1}, pumpNo={2}), cache cleared",
+                pump.PumpId, vendorId, pumpNo);
+            return new AddPumpResult { PumpId = pump.PumpId, VendorId = vendorId, PumpNo = pumpNo };
         }
+    }
+
+    public class AddPumpResult
+    {
+        public int PumpId { get; set; }
+        /// <summary>Resolved contractor — lets "save &amp; add another" keep it selected.</summary>
+        public int? VendorId { get; set; }
+        public int? PumpNo { get; set; }
     }
 
     public class DashboardPumpDto
@@ -888,6 +996,9 @@ namespace asset_monitoring.Services
         /// to this, so they all pick up the normalised name with no change.
         /// </summary>
         public string? VendorName { get; set; }
+
+        /// <summary>Contractor id — lets the edit drawer pre-select the dropdown.</summary>
+        public int? VendorId { get; set; }
 
         /// <summary>Contractor name on its own (NULL for un-migrated rows).</summary>
         public string? ContractorName { get; set; }

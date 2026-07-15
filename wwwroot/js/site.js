@@ -174,10 +174,103 @@
         return bootstrap.Offcanvas.getInstance(el) ?? new bootstrap.Offcanvas(el);
     }
 
+    // ── Contractor picker + pump numbering ───────────────────────────────────
+    let vendorCache = null;
+
+    function loadVendors(selectedVendorId) {
+        const sel = document.getElementById("editVendorId");
+        if (!sel) return Promise.resolve();
+        const apply = (list) => {
+            sel.innerHTML = '<option value="">— Select contractor —</option>' +
+                list.map(v => `<option value="${v.vendorId}">${v.vendorName} (${v.pumpCount})</option>`).join('');
+            if (selectedVendorId) sel.value = String(selectedVendorId);
+            updatePumpNamePreview();
+        };
+        if (vendorCache) { apply(vendorCache); return Promise.resolve(); }
+        return fetch('?handler=Vendors')
+            .then(r => r.json())
+            .then(list => { vendorCache = list || []; apply(vendorCache); })
+            .catch(err => { console.error('vendor load failed', err); sel.innerHTML = '<option value="">— unavailable —</option>'; });
+    }
+
+    function selectedContractorName() {
+        const newName = document.getElementById("editNewVendorName");
+        if (newName && !newName.classList.contains('d-none') && newName.value.trim())
+            return newName.value.trim();
+        const sel = document.getElementById("editVendorId");
+        if (!sel || !sel.value) return null;
+        const opt = sel.options[sel.selectedIndex];
+        return opt ? opt.text.replace(/\s*\(\d+\)\s*$/, '') : null;   // strip the "(n)" pump count
+    }
+
+    // Mirrors PumpDashboardService.PumpDisplayName so the preview matches reality.
+    function updatePumpNamePreview() {
+        const el = document.getElementById("pumpNamePreview");
+        if (!el) return;
+        const name = selectedContractorName();
+        const no   = document.getElementById("editPumpNo")?.value;
+        el.textContent = (name && no) ? `${name} - Pump ${no}`
+                       : name ? `${name} - Pump ?`
+                       : '—';
+    }
+
+    // When a contractor is picked in ADD mode, pre-fill the next free number.
+    function autoFillPumpNo() {
+        const sel     = document.getElementById("editVendorId");
+        const pumpNo  = document.getElementById("editPumpNo");
+        const isAdd   = document.getElementById("editPumpId").value === "0";
+        if (!sel || !pumpNo || !isAdd || !sel.value) { updatePumpNamePreview(); return; }
+        fetch(`?handler=NextPumpNo&vendorId=${encodeURIComponent(sel.value)}`)
+            .then(r => r.json())
+            .then(d => { if (d && d.pumpNo) pumpNo.value = d.pumpNo; updatePumpNamePreview(); })
+            .catch(() => updatePumpNamePreview());
+    }
+
+    function wirePumpNamingInputs() {
+        const sel     = document.getElementById("editVendorId");
+        const newName = document.getElementById("editNewVendorName");
+        const pumpNo  = document.getElementById("editPumpNo");
+        const toggle  = document.getElementById("toggleNewVendorBtn");
+        if (sel && !sel.dataset.wired)     { sel.dataset.wired = "1";     sel.addEventListener('change', autoFillPumpNo); }
+        if (pumpNo && !pumpNo.dataset.wired) { pumpNo.dataset.wired = "1"; pumpNo.addEventListener('input', updatePumpNamePreview); }
+        if (newName && !newName.dataset.wired) { newName.dataset.wired = "1"; newName.addEventListener('input', updatePumpNamePreview); }
+        if (toggle && !toggle.dataset.wired) {
+            toggle.dataset.wired = "1";
+            toggle.addEventListener('click', () => {
+                const showingNew = !newName.classList.contains('d-none');
+                if (showingNew) {                       // back to picking an existing one
+                    newName.classList.add('d-none'); newName.value = '';
+                    sel.classList.remove('d-none');
+                    toggle.innerHTML = '<i class="bi bi-plus-circle"></i> New contractor';
+                } else {                                // typing a brand-new contractor
+                    newName.classList.remove('d-none');
+                    sel.classList.add('d-none'); sel.value = '';
+                    document.getElementById("editPumpNo").value = 1;  // first pump for a new contractor
+                    toggle.innerHTML = '<i class="bi bi-list"></i> Pick existing';
+                }
+                updatePumpNamePreview();
+            });
+        }
+    }
+
+    function resetVendorPicker() {
+        const newName = document.getElementById("editNewVendorName");
+        const sel     = document.getElementById("editVendorId");
+        const toggle  = document.getElementById("toggleNewVendorBtn");
+        if (newName) { newName.classList.add('d-none'); newName.value = ''; }
+        if (sel) sel.classList.remove('d-none');
+        if (toggle) toggle.innerHTML = '<i class="bi bi-plus-circle"></i> New contractor';
+    }
+
     // ── Edit existing pump ────────────────────────────────────────────────────
-    function openEditPumpDrawer(id, vendor, location, status, latitude, longitude, isActive, operatorMobile, jeMobile) {
+    function openEditPumpDrawer(id, vendor, location, status, latitude, longitude, isActive, operatorMobile, jeMobile, vendorId, pumpNo) {
         document.getElementById("editPumpId").value       = id;
         document.getElementById("editVendorName").value   = vendor    ?? "";
+        document.getElementById("editPumpNo").value       = pumpNo    ?? "";
+        resetVendorPicker();
+        wirePumpNamingInputs();
+        loadVendors(vendorId || null);
+        document.getElementById("pumpDrawerSaveAddAnotherBtn").classList.add('d-none');
         document.getElementById("editLocationName").value = location  ?? "";
         document.getElementById("editStatus").value       = status    ?? "OFF";
         document.getElementById("editLatitude").value     = latitude  ?? "";
@@ -218,7 +311,12 @@
             },
             body: JSON.stringify({
                 PumpId:         parseInt(document.getElementById("editPumpId").value),
-                VendorName:     document.getElementById("editVendorName").value,
+                // Keep the legacy column in step with what's displayed.
+                VendorName:     document.getElementById("pumpNamePreview").textContent.trim() === '—'
+                                    ? document.getElementById("editVendorName").value
+                                    : document.getElementById("pumpNamePreview").textContent.trim(),
+                VendorId:       parseInt(document.getElementById("editVendorId").value) || null,
+                PumpNo:         parseInt(document.getElementById("editPumpNo").value) || null,
                 LocationName:   document.getElementById("editLocationName").value,
                 Status:         document.getElementById("editStatus").value,
                 Latitude:       isNaN(latRaw) ? null : latRaw,
@@ -241,6 +339,13 @@
     function openAddPumpDrawer() {
         document.getElementById("editPumpId").value       = "0";
         document.getElementById("editVendorName").value   = "";
+        document.getElementById("editPumpNo").value       = "";
+        resetVendorPicker();
+        wirePumpNamingInputs();
+        loadVendors(null);
+        const addAnother = document.getElementById("pumpDrawerSaveAddAnotherBtn");
+        addAnother.classList.remove('d-none');
+        addAnother.onclick = () => saveNewPump(true);
         document.getElementById("editLocationName").value = "";
         document.getElementById("editStatus").value       = "OFF";
         document.getElementById("editLatitude").value     = "";
@@ -251,7 +356,7 @@
             '<i class="bi bi-plus-circle"></i> Add Pump';
         const btn = document.getElementById("pumpDrawerSaveBtn");
         btn.textContent = "Add Pump";
-        btn.onclick = saveNewPump;
+        btn.onclick = () => saveNewPump(false);
 
         // Populate dropdowns with no pre-selection
         loadPumpUsers('', '');
@@ -263,12 +368,24 @@
         setTimeout(() => initDrawerMap(null, null), 300);
     }
 
-    function saveNewPump() {
+    // addAnother=true keeps the drawer open, holds the contractor and moves to the
+    // next pump number — pumps are normally onboarded several at a time.
+    function saveNewPump(addAnother) {
         const latRaw = parseFloat(document.getElementById("editLatitude").value);
         const lngRaw = parseFloat(document.getElementById("editLongitude").value);
 
         const opSel = document.getElementById("editOperatorMobile");
         const jeSel = document.getElementById("editJeMobile");
+
+        const vendorIdRaw = document.getElementById("editVendorId").value;
+        const newVendor   = document.getElementById("editNewVendorName");
+        const newVendorName = (newVendor && !newVendor.classList.contains('d-none'))
+            ? newVendor.value.trim() : '';
+
+        if (!vendorIdRaw && !newVendorName) {
+            alert("Please choose a contractor (or add a new one).");
+            return;
+        }
 
         fetch('?handler=AddPump', {
             method: 'POST',
@@ -277,6 +394,9 @@
                 'RequestVerificationToken': getToken()
             },
             body: JSON.stringify({
+                VendorId:       parseInt(vendorIdRaw) || null,
+                NewVendorName:  newVendorName || null,
+                PumpNo:         parseInt(document.getElementById("editPumpNo").value) || null,
                 VendorName:     document.getElementById("editVendorName").value,
                 LocationName:   document.getElementById("editLocationName").value,
                 Status:         document.getElementById("editStatus").value,
@@ -289,8 +409,22 @@
         })
         .then(r => r.json())
         .then(res => {
-            if (res.success) { editDrawer.hide(); location.reload(); }
-            else alert("Failed to add pump: " + (res.message ?? "Unknown error"));
+            if (!res.success) { alert("Failed to add pump: " + (res.message ?? "Unknown error")); return; }
+            if (!addAnother) { editDrawer.hide(); location.reload(); return; }
+
+            // Stay put for the next pump of the same contractor: clear the
+            // location/coords, keep the contractor, bump to the next number.
+            vendorCache = null;                       // pump counts changed
+            const keepVendorId = res.vendorId || parseInt(vendorIdRaw) || null;
+            document.getElementById("editLocationName").value = "";
+            document.getElementById("editLatitude").value     = "";
+            document.getElementById("editLongitude").value    = "";
+            document.getElementById("editRemarks").value      = "";
+            resetVendorPicker();
+            loadVendors(keepVendorId).then(() => autoFillPumpNo());
+            const badge = document.getElementById("locationGeoBadge");
+            if (badge) badge.classList.add('d-none');
+            initDrawerMap(null, null);
         })
         .catch(err => { console.error(err); alert("Error adding pump"); });
     }
@@ -314,7 +448,9 @@
                 lng && lng !== '' ? parseFloat(lng) : null,
                 true,
                 btn.dataset.operatorMobile || '',
-                btn.dataset.jeMobile       || ''
+                btn.dataset.jeMobile       || '',
+                btn.dataset.vendorId       || '',
+                btn.dataset.pumpNo         || ''
             );
         });
     });

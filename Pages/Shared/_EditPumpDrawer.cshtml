@@ -14,10 +14,39 @@
         <form id="editPumpForm">
             @Html.AntiForgeryToken()
             <input type="hidden" id="editPumpId" />
-            <div class="mb-3">
-                <label class="form-label">Vendor Name</label>
-                <input type="text" class="form-control" id="editVendorName">
+            @* Contractor + its own pump number. Chosen from a list so the old
+               free-text "Pump_2_X contractor" naming can't come back. *@
+            <div class="mb-2">
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    <span>Contractor</span>
+                    <button type="button" id="toggleNewVendorBtn"
+                            class="btn btn-link btn-sm p-0 text-decoration-none">
+                        <i class="bi bi-plus-circle"></i> New contractor
+                    </button>
+                </label>
+                <select class="form-select" id="editVendorId">
+                    <option value="">— Loading… —</option>
+                </select>
+                <input type="text" class="form-control mt-2 d-none" id="editNewVendorName"
+                       placeholder="New contractor name, e.g. Sharma Construction" />
             </div>
+
+            <div class="row g-2 mb-2">
+                <div class="col-5">
+                    <label class="form-label small text-muted mb-1">Pump #</label>
+                    <input type="number" min="1" class="form-control" id="editPumpNo" placeholder="auto" />
+                </div>
+                <div class="col-7 d-flex align-items-end">
+                    <div class="small text-muted w-100">
+                        Will appear as:<br />
+                        <span id="pumpNamePreview" class="fw-semibold text-dark">—</span>
+                    </div>
+                </div>
+            </div>
+
+            @* Legacy free-text name. Kept only as a fallback for un-migrated rows;
+               hidden so nobody types composites into it again. *@
+            <input type="hidden" id="editVendorName" />
             <div class="mb-3">
                 <label class="form-label d-flex justify-content-between align-items-center">
                     <span>Location</span>
@@ -86,6 +115,12 @@
             </div>
             <button type="button" id="pumpDrawerSaveBtn" class="btn btn-success w-100" onclick="savePump()">
                 <i class="bi bi-check-circle"></i> Save Changes
+            </button>
+            @* Add-mode only: keeps the contractor, bumps the pump number and clears
+               the location, since pumps are usually onboarded several at a time. *@
+            <button type="button" id="pumpDrawerSaveAddAnotherBtn"
+                    class="btn btn-outline-primary w-100 mt-2 d-none">
+                <i class="bi bi-plus-circle"></i> Save &amp; add another for this contractor
             </button>
         </form>
     </div>

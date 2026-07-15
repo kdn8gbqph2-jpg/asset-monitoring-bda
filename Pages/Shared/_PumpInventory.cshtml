@@ -158,6 +158,8 @@
                             {
                                 <button class="btn btn-primary btn-sm edit-pump-btn me-1"
                                         data-pump-id="@pump.PumpId"
+                                        data-vendor-id="@(pump.VendorId?.ToString() ?? "")"
+                                        data-pump-no="@(pump.PumpNo?.ToString() ?? "")"
                                         data-vendor="@pump.VendorName"
                                         data-location="@pump.Location"
                                         data-status="@pump.Status"
